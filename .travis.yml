@@ -6,8 +6,8 @@ services:
     - docker
 
 before_install:
-  - docker build -t web-test ./web
-  - docker run -d --name app web-test
+  - docker build -t fetcher-test ./fetcher
+  - docker run -d --name app fetcher-test
   - docker ps -a
 
 script:

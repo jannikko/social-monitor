@@ -1,7 +1,13 @@
 version: '2'
 services:
-  web:
-    build: ./web
+  fetcher:
+    build: ./fetcher
+    environment:
+      DB_USER: ${POSTGRES_USER},
+      DB_NAME: ${POSTGRES_DB},
+      DB_PASSWORD: ${POSTGRES_PASSWORD},
+      DB_HOST: db,
+      DB_PORT: 5432,
     links:
       - db
     ports:

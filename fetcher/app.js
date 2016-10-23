@@ -6,6 +6,7 @@ const logger = require('winston');
 const expressWinston = require('express-winston');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
+const dotenv = require('dotenv');
 const chalk = require('chalk');
 
 const routes = require('./routes/index');
@@ -66,7 +67,14 @@ app.use(function (req, res, next) {
 // development error handler
 // will print stacktrace
 if (app.get('env') === 'development') {
+
+	// Set the log level to debug
 	logger.level = 'debug';
+
+	// Use the environment variables specified in the .env file
+	dotenv.config();
+
+	// Return the stacktrace
 	app.use(function (err, req, res, next) {
 		res.status(err.status || 500).send(err);
 	});
