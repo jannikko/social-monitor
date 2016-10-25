@@ -9,6 +9,7 @@ const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 
+const db = require('./services/db');
 const routes = require('./routes/index');
 
 /**
@@ -79,6 +80,9 @@ if (app.get('env') === 'development') {
 		res.status(err.status || 500).send(err);
 	});
 }
+
+// Start database pool
+db.init();
 
 // production error handler
 // no stacktraces leaked to user

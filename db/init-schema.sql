@@ -15,11 +15,15 @@ CREATE TABLE IF NOT EXISTS source_topic(
     since_id TIMESTAMP NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS account (
-    id INT PRIMARY KEY,
-    source_topic INT NOT NULL REFERENCES source_topic,
-    account_id TEXT NOT NULL,
-    account_name TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS application (
+    id UUID PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS api_credentials (
+    source TEXT NOT NULL REFERENCES source,
+    application UUID NOT NULL REFERENCES application,
+    app_id TEXT NOT NULL,
+    app_secret TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS datastream (
