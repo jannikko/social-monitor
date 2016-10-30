@@ -11,7 +11,7 @@ describe('/twitter/register', function () {
 	describe('with unregistered applicationId', () => {
 
 		before(() => {
-			sinon.stub(registration, 'isRegistered').returns(Promise.reject());
+			sinon.stub(registration, 'isRegistered').rejects();
 		});
 
 		after(() => {
@@ -37,9 +37,9 @@ describe('/twitter/register', function () {
 		const testToken = 'testtoken';
 
 		before(() => {
-			sinon.stub(registration, 'isRegistered').returns(Promise.resolve(testToken));
-			sinon.stub(twitter, 'requestBearerToken').returns(Promise.resolve('testtoken'));
-			sinon.stub(twitter, 'registerApplication').returns(Promise.resolve());
+			sinon.stub(registration, 'isRegistered').resolves();
+			sinon.stub(twitter, 'requestBearerToken').resolves(testToken);
+			sinon.stub(twitter, 'registerApplication').resolves();
 		});
 
 		after(() => {

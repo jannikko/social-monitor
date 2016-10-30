@@ -27,6 +27,7 @@
     "request": "^2.75.0",
     "serve-favicon": "~2.3.0",
     "sinon": "^1.17.6",
+    "sinon-as-promised": "^4.0.2",
     "supertest": "^2.0.1",
     "winston": "^2.2.0"
   },
