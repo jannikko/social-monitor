@@ -19,7 +19,7 @@ const router = express.Router({mergeParams: true});
  */
 router.route('/timeline').post((req, res) => {
 	const schema = Joi.object().keys({
-		applicationId: Joi.string().required(),
+		applicationId: Joi.string().guid().required(),
 		screenNames: Joi.array().items(Joi.string()).required()
 	});
 
@@ -30,14 +30,13 @@ router.route('/timeline').post((req, res) => {
 
 	const result = Joi.validate(args, schema, {abortEarly: false});
 
-	if (result.error){
+	if (result.error) {
 		return res.status(400).send(responses.invalidArguments(result));
 	}
 
 	if (!registration.isRegistered(args.applicationId)) {
 		return res.status(401).send({
-			error: responses.errorMessage(UNAUTHORIZED, args.applicationId),
-			applicationId: args.applicationId
+			error: responses.errorMessage(UNAUTHORIZED, args.applicationId)
 		});
 	}
 
@@ -61,19 +60,21 @@ router.route('/timeline').post((req, res) => {
 		})
 		.catch((error) => {
 			logger.error('Error when trying to request the timeline: ', error);
-			return res.status(502).send('Upstream server responded with an invalid response.');
+			if (!res.headersSent) {
+				return res.status(500).send();
+			}
 		});
 });
 
 /**
- * Register a client key with the fetcher service
+ * Register a twitter client with the service, request or refresh the bearer token
  * @param {string} applicationId - The applicationId that was used for registration
  * @param {string} twitterId - The API key of the Twitter application
  * @param {string} twitterSecret - The API secret of the Twitter application
  */
-router.route('/register').post((req, res) => {
+router.route('/register').post((req, res, next) => {
 	const schema = Joi.object().keys({
-		applicationId: Joi.string().required(),
+		applicationId: Joi.string().guid().required(),
 		twitterId: Joi.string().required(),
 		twitterSecret: Joi.string().required()
 	});
@@ -86,29 +87,26 @@ router.route('/register').post((req, res) => {
 
 	const result = Joi.validate(args, schema, {abortEarly: false});
 
-	if (result.error){
+	if (result.error) {
 		return res.status(400).send(responses.invalidArguments(result));
 	}
 
-	if (!registration.isRegistered(args.applicationId)) {
-		return res.status(401).send({
-			error: responses.errorMessage(UNAUTHORIZED, args.applicationId),
-			applicationId: args.applicationId
-		});
-	}
-
-	return twitterService.requestBearerToken(args.twitterId, args.twitterSecret)
-		.then((token) => {
-
-			if (!token) {
-				return res.status(502).send('Upstream server responded without a message.')
-			}
-
-			return twitterService.registerApplication(args.twitterId, token);
-
+	return registration.isRegistered(args.applicationId)
+		.then(() => {
+			return twitterService.requestBearerToken(args.twitterId, args.twitterSecret);
 		}, (err) => {
+			res.status(401).send({
+				error: responses.errorMessage(UNAUTHORIZED, 'applicationId')
+			});
+			throw err;
+		})
+		.then((token) => {
+			return twitterService.registerApplication(args.applicationId, token)
+		})
+		.then(() => res.status(200).send())
+		.catch((err) => {
 			logger.error(`Error when requesting a token for client ${args.twitterId}: ${err}`);
-			return res.status(502).send('Upstream server responded with an invalid response.')
+			next(err);
 		});
 });
 

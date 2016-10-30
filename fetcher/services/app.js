@@ -1,4 +1,3 @@
-const http = require('http');
 const express = require('express');
 const path = require('path');
 const favicon = require('serve-favicon');
@@ -9,21 +8,8 @@ const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
 
-const db = require('./services/db');
-const routes = require('./routes/index');
-
-/**
- * Normalize a port into a number, string, or false.
- */
-function normalizePort(val) {
-	const port = parseInt(val, 10);
-
-	if (isNaN(port)) return val;
-
-	if (port >= 0) return port;
-
-	return false;
-}
+const db = require('./db');
+const routes = require('./../routes/index');
 
 /**
  * Event listener for HTTP server "listening" event.
@@ -77,59 +63,21 @@ if (app.get('env') === 'development') {
 
 	// Return the stacktrace
 	app.use(function (err, req, res, next) {
-		res.status(err.status || 500).send(err);
+		logger.error(err);
+		if (!res.headersSent) {
+			res.status(err.status || 500).send(err);
+		}
 	});
 }
-
-// Start database pool
-db.init();
-
 // production error handler
 // no stacktraces leaked to user
 app.use((err, req, res) => {
-	res.status(err.status || 500).send('Internal server error');
+	logger.error(err);
+	if (!res.headersSent){
+		res.status(err.status || 500).send('Internal server error');
+	}
 });
 
 
-/**
- * Get port from environment and store in Express.
- */
 
-const port = normalizePort(process.env.PORT || '8081');
-app.set('port', port);
-
-/**
- * Create HTTP server.
- */
-
-const server = http.createServer(app);
-
-/**
- * Listen on provided port, on all network interfaces.
- */
-server.listen(port);
-server.on('error', (error) => {
-		if (error.syscall !== 'listen') {
-			throw error;
-		}
-
-		const bind = typeof port === 'string' ? 'Pipe ' + port : 'Port ' + port;
-		// handle specific listen errors with friendly messages
-		switch (error.code) {
-			case 'EACCES':
-				logger.error(bind + ' requires elevated privileges');
-				process.exit(1);
-				break;
-			case 'EADDRINUSE':
-				logger.error(bind + ' is already in use');
-				process.exit(1);
-				break;
-			default:
-				throw error;
-		}
-	});
-
-server.on('listening', () => {
-	logger.debug(`Server started on port ${port}`);
-});
-
+module.exports = app;

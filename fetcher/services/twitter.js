@@ -6,6 +6,7 @@ const Promise = require('bluebird');
 
 const sources = require('../enums/sources');
 const application = require('../models/application');
+const apiCredentials = require('../models/api_credentials');
 
 function TwitterTimelineError(screenName, message) {
 	this.name = "TwitterTimelineError";
@@ -62,26 +63,32 @@ function _obtainBearerTokenCredentials(consumerKey, consumerSecret) {
  * Register an application with the service, store the credentials in the database
  * @param applicationId
  * @param bearerToken
+ * @returns {boolean}
  */
 function registerApplication(applicationId, bearerToken){
-	return application.insertOrUpdate(applicationId, bearerToken, sources.TWITTER);
+	return apiCredentials.upsert(sources.TWITTER, applicationId, bearerToken)
+		.then((result) => {
+			if (!(result.rowCount > 0)){
+				throw new Error('Unable to update the api credentials for the applicationId ${applicationId}');
+			}
+		});
 }
 
 /**
  * Requests the twitterService oAuth2 endpoint for a new bearer token
- * @param {String} clientKey
- * @param {String} clientSecret
+ * @param {String} twitterId
+ * @param {String} twitterSecret
  * @returns {Promise}
  */
-function requestBearerToken(clientKey, clientSecret) {
-	logger.info(`Requesting Twitter API for bearer token with client key ${clientKey}`);
+function requestBearerToken(twitterId, twitterSecret) {
+	logger.info(`Requesting Twitter API for bearer token with twitter id ${twitterId}`);
 	return new Promise((resolve, reject) => {
 		request({
 			method: 'POST',
-			url: 'https://api.twitterService.com/oauth2/token',
+			url: 'https://api.twitter.com/oauth2/token',
 			json: true,
 			headers: {
-				'Authorization': 'Basic ' + _obtainBearerTokenCredentials(clientKey, clientSecret),
+				'Authorization': 'Basic ' + _obtainBearerTokenCredentials(twitterId, twitterSecret),
 				'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
 			},
 			body: querystring.stringify({'grant_type': 'client_credentials'})
@@ -89,7 +96,7 @@ function requestBearerToken(clientKey, clientSecret) {
 			if (err) {
 				return reject(err);
 			} else if (!(http.statusCode === 200 && _isValidBearerTokenResponse(body))) {
-				reject(new Error(`Invalid response when trying to request a bearer token for client key: ${clientKey}\n${JSON.stringify(body)}`));
+				reject(new Error(`Invalid response when trying to request a bearer token for client key: ${twitterId}\n${JSON.stringify(body)}`));
 			} else {
 				resolve(_getBearerToken(body));
 			}
@@ -109,7 +116,7 @@ function requestUserTimeline(bearerToken, screenName) {
 	return new Promise((resolve, reject) => {
 		request({
 			method: 'GET',
-			url: 'https://api.twitterService.com/1.1/statuses/user_timeline.json',
+			url: 'https://api.twitter.com/1.1/statuses/user_timeline.json',
 			qs: {'screen_name': screenName},
 			json: true,
 			headers: {

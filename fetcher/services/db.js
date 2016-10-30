@@ -37,7 +37,7 @@ function query(sql, args){
 				logger.error('Error connection to the database: ' + err);
 				return reject(err);
 			}
-
+			
 			client.query(sql, args, (err, result) => {
 				// Release the connection to the connection pool
 				done();

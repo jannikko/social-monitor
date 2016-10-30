@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS application (
 CREATE TABLE IF NOT EXISTS api_credentials (
     source TEXT NOT NULL REFERENCES source,
     application UUID NOT NULL REFERENCES application,
-    app_id TEXT NOT NULL,
-    app_secret TEXT NOT NULL
+    token TEXT NOT NULL,
+    UNIQUE(application, source)
 );
 
 CREATE TABLE IF NOT EXISTS datastream (
@@ -31,3 +31,5 @@ CREATE TABLE IF NOT EXISTS datastream (
     data JSONB NOT NULL,
     source_topic INT NOT NULL REFERENCES source_topic
 );
+
+INSERT INTO source (id) VALUES ('twitter');

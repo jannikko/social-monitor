@@ -2,7 +2,6 @@ const express = require('express');
 const Joi = require('joi');
 const logger = require('winston');
 
-const responses = require('../services/responses');
 const db = require('../services/db');
 const registration = require('../services/registration');
 
