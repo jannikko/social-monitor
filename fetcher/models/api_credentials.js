@@ -38,14 +38,14 @@ function upsert(source, applicationId, token) {
  * @param {string} applicationId
  * @returns Promise
  */
-function getToken(applicationId, source) {
+function get(applicationId, source) {
 	logger.info(`Getting token for application ${applicationId} and source ${source} from table api_credentials`);
-	const sql = 'SELECT * FROM application WHERE id = $1::uuid AND source = $2::text';
+	const sql = 'SELECT * FROM api_credentials WHERE application = $1::uuid AND source = $2::text';
 	return db.query(sql, [applicationId, source]);
 }
 
 module.exports = {
 	insert: insert,
 	upsert: upsert,
-	getToken: getToken
+	get: get
 };

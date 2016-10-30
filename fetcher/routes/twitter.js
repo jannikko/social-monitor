@@ -17,7 +17,7 @@ const router = express.Router({mergeParams: true});
  * @param {string} applicationId - The id of the registered application
  * @param {array} screenNames - An array of the Twitter screenNames that should be fetched
  */
-router.route('/timeline').post((req, res) => {
+router.route('/timeline').post((req, res, next) => {
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required(),
 		screenNames: Joi.array().items(Joi.string()).required()
@@ -52,17 +52,20 @@ router.route('/timeline').post((req, res) => {
 			// Remove the values of the rejected promises from the response array
 			const errors = _.remove(timelines, (t) => t.isRejected());
 
-			if (errors) {
-				return res.status(207).send({errors: errors.map(twitterService.getScreenNameFromError)});
+			if (!_.isEmpty(errors)) {
+				logger.warn(errors.map((err) => err.reason()).join("\n"));
+				return res.status(207).send({errors: errors.map((err) => twitterService.getScreenNameFromError(err.reason()))});
 			}
 
+			// return twitterService.storeTimelines(timelines);
 			return res.status(200).send();
 		})
+		.then(() => {
+			return res.status(200).send(timelines);
+		})
 		.catch((error) => {
-			logger.error('Error when trying to request the timeline: ', error);
-			if (!res.headersSent) {
-				return res.status(500).send();
-			}
+			logger.error(`Error when requesting the timeline for ${args.applicationId}: ${err}`);
+			next(error);
 		});
 });
 
@@ -104,9 +107,9 @@ router.route('/register').post((req, res, next) => {
 			return twitterService.registerApplication(args.applicationId, token)
 		})
 		.then(() => res.status(200).send())
-		.catch((err) => {
-			logger.error(`Error when requesting a token for client ${args.twitterId}: ${err}`);
-			next(err);
+		.catch((error) => {
+			logger.error(`Error when requesting a token for client ${args.applicationId}: ${err}`);
+			next(error);
 		});
 });
 

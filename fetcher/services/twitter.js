@@ -63,7 +63,7 @@ function _obtainBearerTokenCredentials(consumerKey, consumerSecret) {
  * Register an application with the service, store the credentials in the database
  * @param applicationId
  * @param bearerToken
- * @returns {boolean}
+ * @returns {Promise}
  */
 function registerApplication(applicationId, bearerToken){
 	return apiCredentials.upsert(sources.TWITTER, applicationId, bearerToken)
@@ -72,6 +72,23 @@ function registerApplication(applicationId, bearerToken){
 				throw new Error('Unable to update the api credentials for the applicationId ${applicationId}');
 			}
 		});
+}
+
+
+/**
+ * Gets the twitter token from the database
+ * @param applicationId
+ * @returns {Promise.<String>}
+ */
+function getApplicationToken(applicationId){
+	return apiCredentials.get(applicationId, sources.TWITTER)
+		.then((result) => {
+			if (result.rowCount > 0){
+				return _.first(result.rows).token;
+			} else {
+				throw new Error(`No token registered for the application ${applicationId}`);
+			}
+		})
 }
 
 /**
@@ -138,5 +155,6 @@ module.exports = {
 	requestBearerToken,
 	requestUserTimeline,
 	getScreenNameFromError,
-	registerApplication
+	registerApplication,
+	getApplicationToken
 };
