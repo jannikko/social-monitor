@@ -1,5 +1,5 @@
 const uuidGen = require('node-uuid');
-const Joi = require('Joi');
+const Joi = require('joi');
 const logger = require('winston');
 
 const responses = require('./responses');
