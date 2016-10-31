@@ -6,7 +6,7 @@
     "start": "NODE_ENV=production node server.js",
     "dev": "NODE_ENV=development ./node_modules/nodemon/bin/nodemon.js server.js",
     "test": "NODE_ENV=production ./node_modules/mocha/bin/mocha --recursive",
-    "testdev": "NODE_ENV=development ./node_modules/mocha/bin/mocha --recursive --watch"
+    "testdev": "./node_modules/mocha/bin/mocha --recursive --watch"
   },
   "dependencies": {
     "bluebird": "^3.4.6",

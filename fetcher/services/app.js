@@ -7,9 +7,16 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const chalk = require('chalk');
+const Promise = require('bluebird');
 
 const db = require('./db');
 const routes = require('./../routes/index');
+
+Promise.config({
+    cancellation: true
+});
+
+global.Promise = Promise;
 
 /**
  * Event listener for HTTP server "listening" event.
@@ -73,11 +80,10 @@ if (app.get('env') === 'development') {
 // no stacktraces leaked to user
 app.use((err, req, res) => {
 	logger.error(err);
-	if (!res.headersSent){
+	if (!res.headersSent) {
 		res.status(err.status || 500).send('Internal server error');
 	}
 });
-
 
 
 module.exports = app;

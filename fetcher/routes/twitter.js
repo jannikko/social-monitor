@@ -1,14 +1,12 @@
+'use strict';
 const express = require('express');
 const logger = require('winston');
-const Promise = require('bluebird');
 const Joi = require('joi');
 const _ = require('lodash');
 
 const twitterService = require('../services/twitter');
 const registration = require('../services/registration');
 const responses = require('../services/responses');
-
-const UNAUTHORIZED = require('../enums/validation').UNAUTHORIZED;
 
 const router = express.Router({mergeParams: true});
 
@@ -17,10 +15,11 @@ const router = express.Router({mergeParams: true});
  * @param {string} applicationId - The id of the registered application
  * @param {array} screenNames - An array of the Twitter screenNames that should be fetched
  */
-router.route('/timeline').post((req, res, next) => {
+router.route('/timeline').all(registration.middleware).post((req, res, next) => {
+
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required(),
-		screenNames: Joi.array().items(Joi.string()).required()
+		screenNames: Joi.array().items(Joi.string()).min(1).required()
 	});
 
 	const args = {
@@ -34,37 +33,22 @@ router.route('/timeline').post((req, res, next) => {
 		return res.status(400).send(responses.invalidArguments(result));
 	}
 
-	if (!registration.isRegistered(args.applicationId)) {
-		return res.status(401).send({
-			error: responses.errorMessage(UNAUTHORIZED, args.applicationId)
-		});
-	}
-
-	return twitterService.getApplicationToken(args.applicationId)
+	twitterService.getApplicationToken(args.applicationId)
 		.then((token) => Promise.all(args.screenNames.map((name) => twitterService.requestUserTimeline(token, name).reflect())))
-		.then((timelines) => {
+		.then((responses) => Promise.all(responses.map((response) => twitterService.storeTimeline(args.applicationId, response).reflect())))
+		.then((results) => {
+			const errors = _.remove(results, (p) => p.isRejected());
+			const errorsOccured = !_.isEmpty(errors);
 
-			// Empty response from the Twitter API
-			if (!timelines) {
-				return res.status(502).send({message: 'Upstream server responded without a message.'});
-			}
-
-			// Remove the values of the rejected promises from the response array
-			const errors = _.remove(timelines, (t) => t.isRejected());
-
-			if (!_.isEmpty(errors)) {
+			if (errorsOccured) {
 				logger.warn(errors.map((err) => err.reason()).join("\n"));
-				return res.status(207).send({errors: errors.map((err) => twitterService.getScreenNameFromError(err.reason()))});
+				res.status(207).send({errors: errors.map((err) => twitterService.getScreenNameFromError(err.reason()))});
+			} else {
+				res.status(200).send();
 			}
-
-			// return twitterService.storeTimelines(timelines);
-			return res.status(200).send();
-		})
-		.then(() => {
-			return res.status(200).send(timelines);
 		})
 		.catch((error) => {
-			logger.error(`Error when requesting the timeline for ${args.applicationId}: ${err}`);
+			logger.error(`Error when requesting the timeline for ${args.applicationId}: ${error}`);
 			next(error);
 		});
 });
@@ -75,7 +59,7 @@ router.route('/timeline').post((req, res, next) => {
  * @param {string} twitterId - The API key of the Twitter application
  * @param {string} twitterSecret - The API secret of the Twitter application
  */
-router.route('/register').post((req, res, next) => {
+router.route('/register').all(registration.middleware).post((req, res, next) => {
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required(),
 		twitterId: Joi.string().required(),
@@ -94,15 +78,7 @@ router.route('/register').post((req, res, next) => {
 		return res.status(400).send(responses.invalidArguments(result));
 	}
 
-	return registration.isRegistered(args.applicationId)
-		.then(() => {
-			return twitterService.requestBearerToken(args.twitterId, args.twitterSecret);
-		}, (err) => {
-			res.status(401).send({
-				error: responses.errorMessage(UNAUTHORIZED, 'applicationId')
-			});
-			throw err;
-		})
+	return twitterService.requestBearerToken(args.twitterId, args.twitterSecret)
 		.then((token) => {
 			return twitterService.registerApplication(args.applicationId, token)
 		})

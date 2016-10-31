@@ -1,1 +1,1 @@
-module.exports = {INVALID: 'invalid', UNAUTHORIZED: 'unauthorized'};
+module.exports = {INVALID: 'invalid', FORBIDDEN: 'forbidden'};

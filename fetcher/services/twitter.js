@@ -2,7 +2,6 @@ const request = require('request');
 const querystring = require('querystring');
 const _ = require('lodash');
 const logger = require('winston');
-const Promise = require('bluebird');
 
 const sources = require('../enums/sources');
 const application = require('../models/application');
@@ -10,7 +9,7 @@ const apiCredentials = require('../models/api_credentials');
 
 function TwitterTimelineError(screenName, message) {
 	this.name = "TwitterTimelineError";
-	this.message = message || "Error when fetching the timeline for a specific user";
+	this.message = message || `Error when fetching the timeline for a user ${screenName}`;
 	this.screenName = screenName;
 }
 TwitterTimelineError.prototype = Error.prototype;
@@ -65,10 +64,10 @@ function _obtainBearerTokenCredentials(consumerKey, consumerSecret) {
  * @param bearerToken
  * @returns {Promise}
  */
-function registerApplication(applicationId, bearerToken){
+function registerApplication(applicationId, bearerToken) {
 	return apiCredentials.upsert(sources.TWITTER, applicationId, bearerToken)
 		.then((result) => {
-			if (!(result.rowCount > 0)){
+			if (!(result.rowCount > 0)) {
 				throw new Error('Unable to update the api credentials for the applicationId ${applicationId}');
 			}
 		});
@@ -80,10 +79,10 @@ function registerApplication(applicationId, bearerToken){
  * @param applicationId
  * @returns {Promise.<String>}
  */
-function getApplicationToken(applicationId){
+function getApplicationToken(applicationId) {
 	return apiCredentials.get(applicationId, sources.TWITTER)
 		.then((result) => {
-			if (result.rowCount > 0){
+			if (result.rowCount > 0) {
 				return _.first(result.rows).token;
 			} else {
 				throw new Error(`No token registered for the application ${applicationId}`);
@@ -151,10 +150,23 @@ function requestUserTimeline(bearerToken, screenName) {
 	});
 }
 
+function storeTimeline(applicationId, timeline) {
+	return new Promise((resolve, reject) => {
+		if (timeline.isRejected()) {
+			reject(timeline.reason());
+		} else {
+			// TODO store to database and handle errors
+			resolve();
+		}
+	});
+}
+
 module.exports = {
 	requestBearerToken,
 	requestUserTimeline,
 	getScreenNameFromError,
 	registerApplication,
-	getApplicationToken
+	getApplicationToken,
+	TwitterTimelineError,
+	storeTimeline
 };

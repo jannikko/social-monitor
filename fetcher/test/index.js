@@ -1,1 +1,3 @@
-require('sinon-as-promised');
+const Promise = require('bluebird');
+
+require('sinon-as-promised')(Promise);
