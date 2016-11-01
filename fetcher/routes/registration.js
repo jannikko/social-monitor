@@ -4,6 +4,7 @@ const logger = require('winston');
 
 const db = require('../services/db');
 const registration = require('../services/registration');
+const responses = require('../services/responses');
 
 const router = express.Router({mergeParams: true});
 
@@ -12,9 +13,23 @@ const router = express.Router({mergeParams: true});
  * @param {string} applicationId - The id of the application
  */
 router.route('/register').post((req, res) => {
-	return registration.registerApplication()
-		.then((applicationID) => {
-			return res.status(200).send(applicationID);
+	const schema = Joi.object().keys({
+		applicationId: Joi.string().guid().required()
+	});
+
+	const args = {
+		applicationId: req.body.applicationId
+	};
+
+	const result = Joi.validate(args, schema, {abortEarly: false});
+
+	if (result.error) {
+		return res.status(400).send(responses.invalidArguments(result));
+	}
+
+	return registration.registerApplication(args.applicationId)
+		.then(() => {
+			return res.status(200).send();
 		}, (err) => {
 			logger.error(`Error when registering an application: ${err}`);
 			return res.status(500).send('Internal server error during registration');

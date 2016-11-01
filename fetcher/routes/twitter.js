@@ -18,13 +18,16 @@ const router = express.Router({mergeParams: true});
 router.route('/timeline').all(registration.middleware).post((req, res, next) => {
 
 	const schema = Joi.object().keys({
-		applicationId: Joi.string().guid().required(),
-		screenNames: Joi.array().items(Joi.string()).min(1).required()
+			applicationId: Joi.string().guid().required(),
+			accounts: Joi.array().items(
+				Joi.object().keys({
+					screenName: Joi.string().required(),
+					sinceId: Joi.number().optional()})).min(1).required()
 	});
 
 	const args = {
 		applicationId: req.body.applicationId,
-		screenNames: req.body.screenNames
+		accounts: req.body.accounts
 	};
 
 	const result = Joi.validate(args, schema, {abortEarly: false});
@@ -34,17 +37,18 @@ router.route('/timeline').all(registration.middleware).post((req, res, next) => 
 	}
 
 	twitterService.getApplicationToken(args.applicationId)
-		.then((token) => Promise.all(args.screenNames.map((name) => twitterService.requestUserTimeline(token, name).reflect())))
-		.then((responses) => Promise.all(responses.map((response) => twitterService.storeTimeline(args.applicationId, response).reflect())))
-		.then((results) => {
-			const errors = _.remove(results, (p) => p.isRejected());
-			const errorsOccured = !_.isEmpty(errors);
+		.then((token) => Promise.all(args.accounts.map((account) => twitterService.requestUserTimeline(token, account).reflect())))
+		.then((responses) => twitterService.storeTimelines(args.applicationId, responses))
+		.then((result) => {
 
-			if (errorsOccured) {
-				logger.warn(errors.map((err) => err.reason()).join("\n"));
-				res.status(207).send({errors: errors.map((err) => twitterService.getScreenNameFromError(err.reason()))});
+			const errors = result.errors;
+			const dataStream = result.dataStream;
+
+			if (!_.isEmpty(errors)) {
+				logger.warn(errors.join("\n"));
+				res.status(207).send({errors, dataStream});
 			} else {
-				res.status(200).send();
+				res.status(200).send({dataStream});
 			}
 		})
 		.catch((error) => {

@@ -2,15 +2,24 @@ const request = require('request');
 const querystring = require('querystring');
 const _ = require('lodash');
 const logger = require('winston');
+const config = require('config');
 
-const sources = require('../enums/sources');
 const application = require('../models/application');
 const apiCredentials = require('../models/api_credentials');
+const dataStream = require('../models/datastream');
 
-function TwitterTimelineError(screenName, message) {
+const SOURCE_NAME = config.get('source.twitter.name');
+const API_VERSION = config.get('source.twitter.version');
+const TOPIC_NAME = config.get('source.twitter.topic.timeline.name');
+const TIMELINE_TOPIC_NAME = config.get('source.twitter.topic.timeline.endpoint');
+const TWITTER_API_URL = config.get('source.twitter.url');
+
+const TIMELINE_URL = TWITTER_API_URL + API_VERSION + TIMELINE_TOPIC_NAME;
+
+function TwitterTimelineError(account, message) {
 	this.name = "TwitterTimelineError";
-	this.message = message || `Error when fetching the timeline for a user ${screenName}`;
-	this.screenName = screenName;
+	this.message = message || `Error when fetching the timeline for a user ${JSON.stringify(account)}`;
+	this.account = account;
 }
 TwitterTimelineError.prototype = Error.prototype;
 
@@ -19,9 +28,9 @@ TwitterTimelineError.prototype = Error.prototype;
  * @param {TwitterTimelineError} err
  * @returns {String | null}
  */
-function getScreenNameFromError(err) {
+function getAccountFromError(err) {
 	if (err instanceof TwitterTimelineError) {
-		return err.screenName;
+		return err.account;
 	} else {
 		return null;
 	}
@@ -65,7 +74,7 @@ function _obtainBearerTokenCredentials(consumerKey, consumerSecret) {
  * @returns {Promise}
  */
 function registerApplication(applicationId, bearerToken) {
-	return apiCredentials.upsert(sources.TWITTER, applicationId, bearerToken)
+	return apiCredentials.upsert(SOURCE_NAME, applicationId, bearerToken)
 		.then((result) => {
 			if (!(result.rowCount > 0)) {
 				throw new Error('Unable to update the api credentials for the applicationId ${applicationId}');
@@ -80,7 +89,7 @@ function registerApplication(applicationId, bearerToken) {
  * @returns {Promise.<String>}
  */
 function getApplicationToken(applicationId) {
-	return apiCredentials.get(applicationId, sources.TWITTER)
+	return apiCredentials.get(applicationId, SOURCE_NAME)
 		.then((result) => {
 			if (result.rowCount > 0) {
 				return _.first(result.rows).token;
@@ -124,25 +133,25 @@ function requestBearerToken(twitterId, twitterSecret) {
 /**
  * Requests the twitterService user timeline endpoint
  * @param {String} bearerToken
- * @param {String} screenName
+ * @param {object} account
  * @returns {Promise}
  */
-function requestUserTimeline(bearerToken, screenName) {
-	logger.info(`Requesting Twitter API for user timeline with token ${bearerToken} and screenName ${screenName}`);
+function requestUserTimeline(bearerToken, account) {
+	logger.info(`Requesting Twitter API for user timeline with token ${bearerToken} and account ${JSON.stringify(account)}`);
 	return new Promise((resolve, reject) => {
 		request({
 			method: 'GET',
 			url: 'https://api.twitter.com/1.1/statuses/user_timeline.json',
-			qs: {'screen_name': screenName},
+			qs: {'screen_name': account.screenName, 'since_id': account.sinceId},
 			json: true,
 			headers: {
 				'Authorization': 'Bearer ' + bearerToken
 			}
 		}, (err, http, body) => {
 			if (err) {
-				return reject(new TwitterTimelineError(screenName, err.message));
+				return reject(new TwitterTimelineError(account, err.message));
 			} else if (http.statusCode !== 200) {
-				reject(new TwitterTimelineError(screenName, `Invalid response code when trying to request the timeline for screenName: ${screenName}\n${JSON.stringify(body)}`));
+				reject(new TwitterTimelineError(account, `Invalid response code when trying to request the timeline for account: ${JSON.stringify(account)}\n${JSON.stringify(body)}`));
 			} else {
 				resolve(body);
 			}
@@ -150,23 +159,37 @@ function requestUserTimeline(bearerToken, screenName) {
 	});
 }
 
-function storeTimeline(applicationId, timeline) {
-	return new Promise((resolve, reject) => {
-		if (timeline.isRejected()) {
-			reject(timeline.reason());
-		} else {
-			// TODO store to database and handle errors
-			resolve();
-		}
-	});
+function storeTimelines(applicationId, timelines) {
+	if (timelines && _.isEmpty(timelines)) {
+		throw new Error(`Empty response from Twitter API for application ${applicationId}`);
+	}
+
+	// Remove errors from timelines
+	const errors = _.remove(timelines, (p) => p.isRejected());
+	const timelinesPayload = timelines.map((tl) => tl.value());
+
+	return dataStream.insert(applicationId, SOURCE_NAME, TOPIC_NAME, TIMELINE_URL, API_VERSION, timelinesPayload)
+		.then((result) => {
+			if (result.rowCount !== 1) {
+				throw new Error(`Error when inserting datastream for ${applicationId}: ${err}`);
+			} else {
+				const dataStreamId = _.first(result.rows).id;
+
+				return {
+					dataStream: dataStreamId,
+					errors: errors.map((err) => getAccountFromError(err.reason()))
+				};
+			}
+		});
+
 }
 
 module.exports = {
 	requestBearerToken,
 	requestUserTimeline,
-	getScreenNameFromError,
+	getAccountFromError,
 	registerApplication,
 	getApplicationToken,
 	TwitterTimelineError,
-	storeTimeline
+	storeTimelines
 };

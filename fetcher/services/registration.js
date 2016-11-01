@@ -22,9 +22,8 @@ function isRegistered(applicationId) {
 	});
 }
 
-function registerApplication(){
-	const uuid = uuidGen.v4();
-	return application.insert(uuid).then(() => uuid);
+function registerApplication(applicationId){
+	return application.insert(applicationId);
 }
 
 function middleware(req, res, next){

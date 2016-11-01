@@ -120,7 +120,7 @@ describe('/twitter', function () {
 				server.post(ENDPOINT)
 					.send({
 						applicationId: '02A8597A-C4D1-4857-858A-CF8258F871CF',
-						screenNames: ['test']
+						accounts: ['test']
 					})
 					.expect(403, {
 						'error': {property: 'applicationId', type: validation.FORBIDDEN}
@@ -160,10 +160,12 @@ describe('/twitter', function () {
 
 			const testUuid = '02A8597A-C4D1-4857-858A-CF8258F871CF';
 			const testToken = 'testtoken';
-			const mockResponse = [{some: 'data'}, {someMore: 'data'}];
+			const goodMockResponse = {errors: [], dataStream: 123};
+			const someBadMockResponse = {errors: [{screenName: 'outlandish'}], dataStream: 123};
+
 			const goodRequest = {
 				applicationId: testUuid,
-				screenNames: ['outlandish', 'leroyjenkins']
+				accounts: [{screenName: 'outlandish', sinceId: 123}, {screenName: 'leroyjenkins'}]
 			};
 
 			before(() => {
@@ -176,13 +178,15 @@ describe('/twitter', function () {
 
 			describe('with good data', () => {
 				before(() => {
-					sinon.stub(twitter, 'requestUserTimeline').resolves(mockResponse);
+					sinon.stub(twitter, 'requestUserTimeline').resolves(goodMockResponse);
 					sinon.stub(twitter, 'getApplicationToken').resolves(testToken);
+					sinon.stub(twitter, 'storeTimelines').resolves(goodMockResponse);
 				});
 
 				after(() => {
 					twitter.requestUserTimeline.restore();
 					twitter.getApplicationToken.restore();
+					twitter.storeTimelines.restore();
 				});
 
 				it('should respond with OK when registration is successful', (done) => {
@@ -194,24 +198,21 @@ describe('/twitter', function () {
 
 			describe('with some bad screenNames', () => {
 				before(() => {
-					const requestUserTimeline = sinon.stub(twitter, 'requestUserTimeline');
-					requestUserTimeline.withArgs(testToken, _.first(goodRequest.screenNames)).resolves(mockResponse);
-					requestUserTimeline.withArgs(testToken, _.last(goodRequest.screenNames)).rejects(new twitter.TwitterTimelineError(_.last(goodRequest.screenNames)));
+					sinon.stub(twitter, 'requestUserTimeline').resolves();
 					sinon.stub(twitter, 'getApplicationToken').resolves(testToken);
+					sinon.stub(twitter, 'storeTimelines').resolves(someBadMockResponse);
 				});
 
 				after(() => {
 					twitter.requestUserTimeline.restore();
 					twitter.getApplicationToken.restore();
+					twitter.storeTimelines.restore();
 				});
 
 				it('should respond with 207 Multi-Status', (done) => {
 					server.post(ENDPOINT)
-						.send({
-							applicationId: testUuid,
-							screenNames: ['outlandish', 'leroyjenkins']
-						})
-						.expect(207, {errors: ['leroyjenkins']})
+						.send(goodRequest)
+						.expect(207, {errors: [{screenName: 'outlandish'}], dataStream: 123})
 						.end((err, res) => {
 							if (err) throw err;
 							done();
@@ -234,7 +235,7 @@ describe('/twitter', function () {
 					server.post(ENDPOINT)
 						.send({
 							applicationId: testUuid,
-							screenNames: []
+							accounts: []
 						})
 						.expect(400, done);
 				});
@@ -242,30 +243,25 @@ describe('/twitter', function () {
 
 			describe('with good screenNames', () => {
 				before(() => {
-					const requestUserTimeline = sinon.stub(twitter, 'requestUserTimeline');
-					requestUserTimeline.withArgs(testToken, _.first(goodRequest.screenNames)).resolves(mockResponse);
-					requestUserTimeline.withArgs(testToken, _.last(goodRequest.screenNames)).resolves(mockResponse);
+					sinon.stub(twitter, 'requestUserTimeline').resolves();
 					sinon.stub(twitter, 'getApplicationToken').resolves(testToken);
-					sinon.stub(twitter, 'storeTimeline').resolves();
+					sinon.stub(twitter, 'storeTimelines').resolves(goodMockResponse);
 				});
 
 				after(() => {
 					twitter.requestUserTimeline.restore();
 					twitter.getApplicationToken.restore();
-					twitter.storeTimeline.restore();
+					twitter.storeTimelines.restore();
 				});
 
 				it('should respond with 200 OK', (done) => {
 					server.post(ENDPOINT)
-						.send({
-							applicationId: testUuid,
-							screenNames: ['outlandish', 'leroyjenkins']
-						})
+						.send(goodRequest)
 						.expect(200, done)
 				});
 
 				it('should call storeTimelines for each good screenName', (done) => {
-					assert.ok(twitter.storeTimeline.calledTwice);
+					assert.ok(twitter.storeTimelines.calledOnce);
 					done();
 				});
 			});

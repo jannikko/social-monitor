@@ -6,17 +6,19 @@ CREATE TABLE IF NOT EXISTS topic(
     id TEXT PRIMARY KEY
 );
 
-CREATE TABLE IF NOT EXISTS source_topic(
-    id INT PRIMARY KEY,
-    source TEXT NOT NULL REFERENCES source,
-    topic TEXT NOT NULL REFERENCES topic,
-    endpoint TEXT NOT NULL,
-    api_version TEXT NOT NULL,
-    since_id TIMESTAMP NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS application (
     id UUID PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS datastream (
+    id SERIAL PRIMARY KEY,
+    application UUID NOT NULL REFERENCES application,
+    source TEXT NOT NULL REFERENCES source,
+    topic TEXT NOT NULL REFERENCES topic,
+    url TEXT NOT NULL,
+    api_version TEXT NOT NULL,
+    date TIMESTAMP DEFAULT current_timestamp,
+    data JSON NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS api_credentials (
@@ -26,10 +28,5 @@ CREATE TABLE IF NOT EXISTS api_credentials (
     UNIQUE(application, source)
 );
 
-CREATE TABLE IF NOT EXISTS datastream (
-    id INT PRIMARY KEY,
-    data JSONB NOT NULL,
-    source_topic INT NOT NULL REFERENCES source_topic
-);
-
 INSERT INTO source (id) VALUES ('twitter');
+INSERT INTO topic (id) VALUES ('timeline');

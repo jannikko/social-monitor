@@ -1,3 +1,16 @@
 {
-  "dbPoolSize": 5
+  "dbPoolSize": 5,
+  "source": {
+    "twitter": {
+      "name": "twitter",
+      "version": "1.1",
+      "url": "https://api.twitter.com/",
+      "topic": {
+        "timeline": {
+          "name": "timeline",
+          "endpoint": "/statuses/user_timeline.json"
+        }
+      }
+    }
+  }
 }
