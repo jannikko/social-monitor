@@ -153,14 +153,18 @@ function requestUserTimeline(bearerToken, account) {
 			} else if (http.statusCode !== 200) {
 				reject(new TwitterTimelineError(account, `Invalid response code when trying to request the timeline for account: ${JSON.stringify(account)}\n${JSON.stringify(body)}`));
 			} else {
-				resolve(body);
+				resolve({
+					sinceId: account.sinceId,
+					screenName: account.screenName,
+					timeline: body
+				});
 			}
 		});
 	});
 }
 
 function storeTimelines(applicationId, timelines) {
-	if (timelines && _.isEmpty(timelines)) {
+	if (!timelines || _.isEmpty(timelines)) {
 		throw new Error(`Empty response from Twitter API for application ${applicationId}`);
 	}
 
@@ -171,7 +175,7 @@ function storeTimelines(applicationId, timelines) {
 	return dataStream.insert(applicationId, SOURCE_NAME, TOPIC_NAME, TIMELINE_URL, API_VERSION, timelinesPayload)
 		.then((result) => {
 			if (result.rowCount !== 1) {
-				throw new Error(`Error when inserting datastream for ${applicationId}: ${err}`);
+				throw new Error(`Error when inserting twitter datastream for ${applicationId}: ${err}`);
 			} else {
 				const dataStreamId = _.first(result.rows).id;
 
@@ -184,6 +188,16 @@ function storeTimelines(applicationId, timelines) {
 
 }
 
+function getTimeline(dataStreamId) {
+	return dataStream.get(dataStreamId)
+		.then((result) => {
+			if (result.rowCount !== 1) {
+				throw new Error(`Error when getting twitter datastream for ${applicationId}: ${err}`);
+			}
+			return _.first(result.rows);
+		});
+}
+
 module.exports = {
 	requestBearerToken,
 	requestUserTimeline,
@@ -191,5 +205,6 @@ module.exports = {
 	registerApplication,
 	getApplicationToken,
 	TwitterTimelineError,
-	storeTimelines
+	storeTimelines,
+	getTimeline
 };

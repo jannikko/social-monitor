@@ -18,11 +18,12 @@ const router = express.Router({mergeParams: true});
 router.route('/timeline').all(registration.middleware).post((req, res, next) => {
 
 	const schema = Joi.object().keys({
-			applicationId: Joi.string().guid().required(),
-			accounts: Joi.array().items(
-				Joi.object().keys({
-					screenName: Joi.string().required(),
-					sinceId: Joi.number().optional()})).min(1).required()
+		applicationId: Joi.string().guid().required(),
+		accounts: Joi.array().items(
+			Joi.object().keys({
+				screenName: Joi.string().required(),
+				sinceId: Joi.number().optional()
+			})).min(1).required()
 	});
 
 	const args = {
@@ -42,17 +43,42 @@ router.route('/timeline').all(registration.middleware).post((req, res, next) => 
 		.then((result) => {
 
 			const errors = result.errors;
-			const dataStream = result.dataStream;
+			const dataStreamId = result.dataStream;
 
 			if (!_.isEmpty(errors)) {
 				logger.warn(errors.join("\n"));
-				res.status(207).send({errors, dataStream});
+				res.status(207).send({errors, dataStreamId});
 			} else {
-				res.status(200).send({dataStream});
+				res.status(200).send({dataStreamId});
 			}
 		})
 		.catch((error) => {
-			logger.error(`Error when requesting the timeline for ${args.applicationId}: ${error}`);
+			logger.error(`Error when requesting the timeline for applicationId ${args.applicationId} from the twitter API: ${error}`);
+			next(error);
+		});
+});
+
+router.route('/timeline/:id').get((req, res, next) => {
+	const schema = Joi.object().keys({
+		dataStreamId: Joi.number().required()
+	});
+
+	const args = {
+		dataStreamId: req.params.id
+	};
+
+	const result = Joi.validate(args, schema, {abortEarly: false});
+
+	if (result.error) {
+		return res.status(400).send(responses.invalidArguments(result));
+	}
+
+	twitterService.getTimeline(args.dataStreamId)
+		.then((dataStream) => {
+			res.status(200).send({dataStream: dataStream.data});
+		})
+		.catch((error) => {
+			logger.error(`Error when trying to get the twitter timeline from the dataStreamId ${args.dataStreamId}: ${error}`);
 			next(error);
 		});
 });
