@@ -163,6 +163,12 @@ function requestUserTimeline(bearerToken, account) {
 	});
 }
 
+/**
+ * Store an array of timelines as JSON in the database
+ * @param {String} applicationId
+ * @param {Array} timelines
+ * @returns {Promise}
+ */
 function storeTimelines(applicationId, timelines) {
 	if (!timelines || _.isEmpty(timelines)) {
 		throw new Error(`Empty response from Twitter API for application ${applicationId}`);
@@ -188,6 +194,11 @@ function storeTimelines(applicationId, timelines) {
 
 }
 
+/**
+ * Query the timeline for the dataStreamId
+ * @param {String} dataStreamId
+ * @returns {Promise}
+ */
 function getTimeline(dataStreamId) {
 	return dataStream.get(dataStreamId)
 		.then((result) => {

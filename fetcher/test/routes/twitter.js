@@ -9,7 +9,7 @@ const twitter = require('../../services/twitter');
 
 describe('/twitter', function () {
 
-	describe('/register', () => {
+	describe('POST /register', () => {
 
 		const ENDPOINT = '/twitter/register';
 
@@ -102,7 +102,7 @@ describe('/twitter', function () {
 		});
 	});
 
-	describe('/timeline', function () {
+	describe('POST /timeline', function () {
 
 		const ENDPOINT = '/twitter/timeline';
 
@@ -212,7 +212,7 @@ describe('/twitter', function () {
 				it('should respond with 207 Multi-Status', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(207, {errors: [{screenName: 'outlandish'}], dataStream: 123})
+						.expect(207, {errors: [{screenName: 'outlandish'}], dataStreamId: 123})
 						.end((err, res) => {
 							if (err) throw err;
 							done();
@@ -264,6 +264,26 @@ describe('/twitter', function () {
 					assert.ok(twitter.storeTimelines.calledOnce);
 					done();
 				});
+			});
+		});
+	});
+
+	describe('GET /timeline', function () {
+
+		const ENDPOINT = '/twitter/timeline/1';
+
+		describe('good request', () => {
+
+			before(() => {
+				sinon.stub(twitter, 'getTimeline').resolves({"data": []});
+			});
+
+			after(() => {
+				twitter.getTimeline.restore();
+			});
+
+			it('should respond with an error, if the validation fails', (done) => {
+				server.get(ENDPOINT).expect(200, done);
 			});
 		});
 	});
