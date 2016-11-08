@@ -181,7 +181,7 @@ function storeTimelines(applicationId, timelines) {
 	return dataStream.insert(applicationId, SOURCE_NAME, TOPIC_NAME, TIMELINE_URL, API_VERSION, timelinesPayload)
 		.then((result) => {
 			if (result.rowCount !== 1) {
-				throw new Error(`Error when inserting twitter datastream for ${applicationId}: ${err}`);
+				throw new Error(`Error when inserting twitter datastream for ${applicationId}`);
 			} else {
 				const dataStreamId = _.first(result.rows).id;
 
@@ -203,7 +203,7 @@ function getTimeline(dataStreamId) {
 	return dataStream.get(dataStreamId)
 		.then((result) => {
 			if (result.rowCount !== 1) {
-				throw new Error(`Error when getting twitter datastream for ${applicationId}: ${err}`);
+				return null;
 			}
 			return _.first(result.rows);
 		});

@@ -3,15 +3,40 @@ services:
   fetcher:
     build: ./fetcher
     environment:
-      DB_USER: ${POSTGRES_USER},
-      DB_NAME: ${POSTGRES_DB},
-      DB_PASSWORD: ${POSTGRES_PASSWORD},
-      DB_HOST: db,
-      DB_PORT: 5432,
+      DB_USER: ${POSTGRES_USER}
+      DB_NAME: ${POSTGRES_DB}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
     links:
       - db
     ports:
       - "8081:8081"
+  ai:
+    restart: always
+    build: ./ai
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_NAME: ${POSTGRES_DB}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+    expose:
+      - "8000"
+    links:
+      - db:db
+    command: /usr/local/bin/gunicorn -w 2 -b :8000 app:app
+  nginx:
+      restart: always
+      build: ./nginx/
+      ports:
+        - "80:80"
+      volumes:
+        - /www/static
+      volumes_from:
+        - ai
+      links:
+        - ai:ai
   db:
     image: library/postgres
     environment:

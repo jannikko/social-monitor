@@ -282,8 +282,23 @@ describe('/twitter', function () {
 				twitter.getTimeline.restore();
 			});
 
-			it('should respond with an error, if the validation fails', (done) => {
+			it('should respond with 200 OK', (done) => {
 				server.get(ENDPOINT).expect(200, done);
+			});
+		});
+
+		describe('good request with id not in db', () => {
+
+			before(() => {
+				sinon.stub(twitter, 'getTimeline').resolves(null);
+			});
+
+			after(() => {
+				twitter.getTimeline.restore();
+			});
+
+			it('should respond with 404', (done) => {
+				server.get(ENDPOINT).expect(404, done);
 			});
 		});
 	});

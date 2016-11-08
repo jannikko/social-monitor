@@ -46,7 +46,7 @@ router.route('/timeline').all(registration.middleware).post((req, res, next) => 
 			const dataStreamId = result.dataStream;
 
 			if (!_.isEmpty(errors)) {
-				logger.warn(errors.join("\n"));
+				logger.warn(`Twitter requests for applicationId ${args.applicationId} returned some invalid responses: ${errors.join('\n')}`);
 				res.status(207).send({errors, dataStreamId});
 			} else {
 				res.status(200).send({dataStreamId});
@@ -75,7 +75,13 @@ router.route('/timeline/:id').get((req, res, next) => {
 
 	twitterService.getTimeline(args.dataStreamId)
 		.then((dataStream) => {
-			res.status(200).send({dataStream: dataStream.data});
+
+			if (dataStream) {
+				res.status(200).send({dataStream: dataStream.data});
+			} else{
+				res.status(404).send();
+			}
+
 		})
 		.catch((error) => {
 			logger.error(`Error when trying to get the twitter timeline from the dataStreamId ${args.dataStreamId}: ${error}`);
