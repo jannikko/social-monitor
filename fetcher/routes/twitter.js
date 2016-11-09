@@ -13,7 +13,7 @@ const router = express.Router({mergeParams: true});
 /**
  * Request the Twitter timeline for multiple users
  * @param {string} applicationId - The id of the registered application
- * @param {array} screenNames - An array of the Twitter screenNames that should be fetched
+ * @param {array} accounts - An array of the Twitter screenNames that should be fetched
  */
 router.route('/timeline').all(registration.middleware).post((req, res, next) => {
 

@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+POSTGRES="psql -d ${POSTGRES_DB} -U ${POSTGRES_USER}"
+
+echo "Creating database role: ${AI_DB_USER}"
+
+$POSTGRES <<-EOSQL
+CREATE USER ${AI_DB_USER} WITH PASSWORD '${AI_DB_PASS}';
+EOSQL
+
+echo "Creating database role: ${FETCHER_DB_USER}"
+
+$POSTGRES <<-EOSQL
+CREATE USER ${FETCHER_DB_USER} WITH PASSWORD '${FETCHER_DB_PASS}';
+EOSQL

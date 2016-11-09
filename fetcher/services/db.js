@@ -24,6 +24,8 @@ function init(){
 	_pool.on('error', function (err, client) {
 		logger.error('Idle client error', err.message, err.stack)
 	});
+
+	return _pool;
 }
 
 function get(){

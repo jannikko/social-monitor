@@ -3,9 +3,9 @@ services:
   fetcher:
     build: ./fetcher
     environment:
-      DB_USER: ${POSTGRES_USER}
-      DB_NAME: ${POSTGRES_DB}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_USER: ${FETCHER_DB_NAME}
+      DB_NAME: ${FETCHER_DB_USER}
+      DB_PASSWORD: ${FETCHER_DB_PASSWORD}
       DB_HOST: db
       DB_PORT: 5432
     links:
@@ -16,9 +16,9 @@ services:
     restart: always
     build: ./ai
     environment:
-      DB_USER: ${POSTGRES_USER}
-      DB_NAME: ${POSTGRES_DB}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_USER: ${AI_DB_NAME}
+      DB_NAME: ${AI_DB_USER}
+      DB_PASSWORD: ${AI_DB_PASSWORD}
       DB_HOST: db
       DB_PORT: 5432
     expose:
@@ -38,13 +38,18 @@ services:
       links:
         - ai:ai
   db:
-    image: library/postgres
+    build:
+      context: ./db
+      args:
+        AI_DB_NAME: ${AI_DB_NAME}
+        AI_DB_USER: ${AI_DB_USER}
+        AI_DB_PASSWORD: ${AI_DB_PASSWORD}
+        FETCHER_DB_NAME: ${FETCHER_DB_NAME}
+        FETCHER_DB_USER: ${FETCHER_DB_USER}
+        FETCHER_DB_PASSWORD: ${FETCHER_DB_PASSWORD}
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - ./db/pgdata:/pgdata
-      - ./db/init-schema.sql:/docker-entrypoint-initdb.d/init-schema.sql
     ports:
       - "5432:5432"

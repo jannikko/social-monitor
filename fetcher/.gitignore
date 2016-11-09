@@ -45,3 +45,5 @@ jspm_packages
 
 .idea
 .env
+
+.migrate

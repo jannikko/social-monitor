@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+POSTGRES="psql -d ${POSTGRES_DB} -U ${POSTGRES_USER}"
+
+echo "Creating database: ${AI_DB_NAME}"
+
+$POSTGRES <<EOSQL
+CREATE DATABASE ${AI_DB_NAME} OWNER ${AI_DB_USER};
+EOSQL
+
+echo "Creating database: ${FETCHER_DB_NAME}"
+
+$POSTGRES <<EOSQL
+CREATE DATABASE ${FETCHER_DB_NAME} OWNER ${FETCHER_DB_USER};
+EOSQL

@@ -6,7 +6,9 @@
     "start": "NODE_ENV=production node server.js",
     "dev": "NODE_ENV=development ./node_modules/nodemon/bin/nodemon.js server.js",
     "test": "NODE_ENV=production ./node_modules/mocha/bin/mocha --recursive",
-    "testdev": "./node_modules/mocha/bin/mocha --recursive --watch"
+    "testdev": "./node_modules/mocha/bin/mocha --recursive --watch",
+    "migrate-up": "./node_modules/migrate/bin/migrate",
+    "migrate-down": "./node_modules/migrate/bin/migrate down"
   },
   "dependencies": {
     "bluebird": "^3.4.6",
@@ -22,6 +24,7 @@
     "express-winston": "^2.0.0",
     "joi": "^9.2.0",
     "lodash": "^4.16.4",
+    "migrate": "^0.2.3",
     "node-uuid": "^1.4.7",
     "pg": "^6.1.0",
     "request": "^2.75.0",
