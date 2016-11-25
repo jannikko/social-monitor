@@ -12,7 +12,7 @@ const router = express.Router({mergeParams: true});
  * Register a new application with the service
  * @param {string} applicationId - The id of the application
  */
-router.route('/register').post((req, res) => {
+router.route('/registration/register').post((req, res) => {
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required()
 	});

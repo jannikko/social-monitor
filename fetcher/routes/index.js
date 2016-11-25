@@ -8,7 +8,7 @@ router.get('/', function(req, res, next) {
   res.render('index', { title: 'Express' });
 });
 
-router.use('/registration', registration);
-router.use('/twitter', twitter);
+router.use(registration);
+router.use(twitter);
 
 module.exports = router;

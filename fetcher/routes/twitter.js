@@ -7,15 +7,22 @@ const _ = require('lodash');
 const twitterService = require('../services/twitter');
 const registration = require('../services/registration');
 const responses = require('../services/responses');
+const util = require('../services/util');
 
 const router = express.Router({mergeParams: true});
+
+const ROUTES = {
+	'timeline': '/twitter/timeline/:id',
+	'timelines': '/twitter/timeline',
+	'register': '/twitter/timeline/register'
+};
 
 /**
  * Request the Twitter timeline for multiple users
  * @param {string} applicationId - The id of the registered application
  * @param {array} accounts - An array of the Twitter screenNames that should be fetched
  */
-router.route('/timeline').all(registration.middleware).post((req, res, next) => {
+router.route(ROUTES.timelines).all(registration.middleware).post((req, res, next) => {
 
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required(),
@@ -45,11 +52,13 @@ router.route('/timeline').all(registration.middleware).post((req, res, next) => 
 			const errors = result.errors;
 			const dataStreamId = result.dataStream;
 
+			res.location(util.getAbsoluteUrl(req, ROUTES.timeline, {id: dataStreamId}));
+			// What if all are errors
 			if (!_.isEmpty(errors)) {
 				logger.warn(`Twitter requests for applicationId ${args.applicationId} returned some invalid responses: ${errors.join('\n')}`);
-				res.status(207).send({errors, dataStreamId});
+				res.status(201).send({errors});
 			} else {
-				res.status(200).send({dataStreamId});
+				res.status(201).send();
 			}
 		})
 		.catch((error) => {
@@ -58,7 +67,7 @@ router.route('/timeline').all(registration.middleware).post((req, res, next) => 
 		});
 });
 
-router.route('/timeline/:id').get((req, res, next) => {
+router.route(ROUTES.timeline).get((req, res, next) => {
 	const schema = Joi.object().keys({
 		dataStreamId: Joi.number().required()
 	});
@@ -78,7 +87,7 @@ router.route('/timeline/:id').get((req, res, next) => {
 
 			if (dataStream) {
 				res.status(200).send({dataStream: dataStream.data});
-			} else{
+			} else {
 				res.status(404).send();
 			}
 
@@ -95,7 +104,7 @@ router.route('/timeline/:id').get((req, res, next) => {
  * @param {string} twitterId - The API key of the Twitter application
  * @param {string} twitterSecret - The API secret of the Twitter application
  */
-router.route('/register').all(registration.middleware).post((req, res, next) => {
+router.route(ROUTES.register).all(registration.middleware).post((req, res, next) => {
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required(),
 		twitterId: Joi.string().required(),
