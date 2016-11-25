@@ -14,7 +14,7 @@ const router = express.Router({mergeParams: true});
 const ROUTES = {
 	'timeline': '/twitter/timeline/:id',
 	'timelines': '/twitter/timeline',
-	'register': '/twitter/timeline/register'
+	'register': '/twitter/register'
 };
 
 /**
@@ -56,7 +56,7 @@ router.route(ROUTES.timelines).all(registration.middleware).post((req, res, next
 			// What if all are errors
 			if (!_.isEmpty(errors)) {
 				logger.warn(`Twitter requests for applicationId ${args.applicationId} returned some invalid responses: ${errors.join('\n')}`);
-				res.status(201).send({errors});
+				res.status(207).send({errors});
 			} else {
 				res.status(201).send();
 			}

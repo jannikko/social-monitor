@@ -192,7 +192,7 @@ describe('/twitter', function () {
 				it('should respond with OK when registration is successful', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(200, done)
+						.expect(201, done)
 				});
 			});
 
@@ -212,7 +212,7 @@ describe('/twitter', function () {
 				it('should respond with 207 Multi-Status', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(207, {errors: [{screenName: 'outlandish'}], dataStreamId: 123})
+						.expect(207, {errors: [{screenName: 'outlandish'}]})
 						.end((err, res) => {
 							if (err) throw err;
 							done();
@@ -254,10 +254,10 @@ describe('/twitter', function () {
 					twitter.storeTimelines.restore();
 				});
 
-				it('should respond with 200 OK', (done) => {
+				it('should respond with 201 Created', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(200, done)
+						.expect(201, done)
 				});
 
 				it('should call storeTimelines for each good screenName', (done) => {
