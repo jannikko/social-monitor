@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, ForeignKey, TypeDecorator, CHAR, ARRAY, \
-    insert, select, UniqueConstraint, DateTime
+    insert, select, UniqueConstraint, DateTime, Float
 from sqlalchemy.dialects.postgresql import UUID
 from enums import SOURCES
 import datetime
@@ -67,20 +67,21 @@ account = Table('account', metadata,
                 Column('source', String, ForeignKey('source.id'), nullable=False),
                 Column('application', GUID, ForeignKey('application.id'), nullable=False),
                 Column('since_id', String, nullable=True),
+                Column('timeline', ARRAY(String), nullable=True),
                 UniqueConstraint('name', 'source', 'application', name='uix_1'))
-
-topic = Table('topic', metadata,
-              Column('id', Integer, primary_key=True),
-              Column('result', ARRAY(String), nullable=False),
-              Column('date', DateTime, nullable=False, default=datetime.datetime.now()),
-              Column('words', ARRAY(Integer), nullable=False),
-              Column('topic_group', Integer, ForeignKey('topic_group.id'), nullable=False),
-              Column('account', Integer, ForeignKey('account.id'), nullable=False))
 
 topic_group = Table('topic_group', metadata,
                     Column('id', Integer, primary_key=True),
-                    Column('application', GUID, ForeignKey('application.id'), nullable=False, unique=True),
+                    Column('date', DateTime, nullable=False, default=datetime.datetime.now()),
+                    Column('application', GUID, ForeignKey('application.id'), nullable=False),
+                    Column('features', ARRAY(Float), nullable=False),
                     Column('wordvec', ARRAY(String), nullable=False))
+
+topic = Table('topic', metadata,
+              Column('id', Integer, primary_key=True),
+              Column('weights', ARRAY(Float), nullable=False),
+              Column('topic_group', Integer, ForeignKey('topic_group.id'), nullable=False),
+              Column('account', Integer, ForeignKey('account.id'), nullable=False))
 
 metadata.create_all(engine)
 

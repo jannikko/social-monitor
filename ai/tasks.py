@@ -5,7 +5,7 @@ from urllib.error import HTTPError
 from enums import SOURCES
 from models import account, topic_group, topic, engine
 from sqlalchemy.sql.expression import insert, select, update
-from topicextraction import getarticlewords, makematrix, nnmf, showfeatures
+from topicextraction import find_topics
 import json
 
 TWITTER_TIMELINE = config.get('TWITTER_TIMELINE')
@@ -27,13 +27,23 @@ def create_timeline_request(application_id, twitter_accounts):
     return Request(TWITTER_TIMELINE, data=request_body, headers={'content-type': 'application/json'})
 
 
+def find_id_by_name(accounts, name):
+    for account in accounts:
+        if account['name'] == name:
+            return account['id']
+
+    return None
+
+
+# TODO since_id speichern, tweets abspeichern, window implementieren, tests + refactoring, nachfragen online lda
+
 @celery.task()
 def timeline(application_id):
     with engine.begin() as conn:
-        account_select_stmt = select([account]).where(
+        account_select = select([account]).where(
             account.c.application == application_id and account.c.source == SOURCES['TWITTER'])
 
-        twitter_accounts = conn.execute(account_select_stmt)
+        twitter_accounts = conn.execute(account_select).fetchall()
         request = create_timeline_request(application_id, twitter_accounts)
 
         try:
@@ -49,15 +59,21 @@ def timeline(application_id):
                     for stream in datastream_response['dataStream']
                     if 'timeline' in stream and len(stream['timeline']) > 0]
 
-                all_words, account_words, account_names = getarticlewords(accounts)
-                matrix, wordvec = makematrix(all_words, account_words)
-                if matrix.shape[1] > 5:
-                    W, H = nnmf(matrix, 5, 200)
-                    showfeatures(W, H, account_names, wordvec)
+                account_names = [a['username'] for a in accounts]
+                feeds = [a['feed'] for a in accounts]
 
+                W, H, wordvec = find_topics(feeds)
+
+                topic_group_insert = insert(topic_group, values={'application': application_id, 'features': H.tolist(),
+                                                                 'wordvec': wordvec})
+                topic_group_id = conn.execute(topic_group_insert).inserted_primary_key[0]
+
+                for name, weights in zip(account_names, W):
+                    account_id = find_id_by_name(twitter_accounts, name)
+                    topic_insert = insert(topic, values={'weights': weights.tolist(),
+                                                         'topic_group': topic_group_id,
+                                                         'account': account_id})
+                    conn.execute(topic_insert)
 
         except HTTPError as e:
             print(e.read())
-
-            # insert_topic_group = insert(topic_group)
-            # group_id = conn.execute(insert_topic_group).inserted_primary_key[0]
