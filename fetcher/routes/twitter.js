@@ -14,7 +14,9 @@ const router = express.Router({mergeParams: true});
 const ROUTES = {
 	'timeline': '/twitter/timeline/:id',
 	'timelines': '/twitter/timeline',
-	'register': '/twitter/register'
+	'register': '/twitter/register',
+	'search': '/twitter/search',
+	'followers': '/twitter/followers'
 };
 
 /**
@@ -29,7 +31,8 @@ router.route(ROUTES.timelines).all(registration.middleware).post((req, res, next
 		accounts: Joi.array().items(
 			Joi.object().keys({
 				screenName: Joi.string().required(),
-				sinceId: Joi.number().optional()
+				sinceId: Joi.number().optional(),
+				maxId: Joi.number().optional()
 			})).min(1).required()
 	});
 
@@ -46,54 +49,24 @@ router.route(ROUTES.timelines).all(registration.middleware).post((req, res, next
 
 	twitterService.getApplicationToken(args.applicationId)
 		.then((token) => Promise.all(args.accounts.map((account) => twitterService.requestUserTimeline(token, account).reflect())))
-		.then((responses) => twitterService.storeTimelines(args.applicationId, responses))
-		.then((result) => {
+		.then((results) => {
 
-			const errors = result.errors;
-			const dataStreamId = result.dataStream;
+			const errors = _.remove(results, (result) => result.isRejected())
+				.map(err => err.reason())
+				.map(twitterTimelineError => {
+					return {
+						screenName: twitterTimelineError.account.screenName,
+						status: twitterTimelineError.status
+					};
+				});
 
-			res.location(util.getAbsoluteUrl(req, ROUTES.timeline, {id: dataStreamId}));
-			// What if all are errors
-			if (!_.isEmpty(errors)) {
-				logger.warn(`Twitter requests for applicationId ${args.applicationId} returned some invalid responses: ${errors.join('\n')}`);
-				res.status(207).send({errors});
-			} else {
-				res.status(201).send();
-			}
+			const values = results.map((tl) => tl.value());
+			
+
+			res.status(200).send({success: values, errors: errors});
 		})
 		.catch((error) => {
 			logger.error(`Error when requesting the timeline for applicationId ${args.applicationId} from the twitter API: ${error}`);
-			next(error);
-		});
-});
-
-router.route(ROUTES.timeline).get((req, res, next) => {
-	const schema = Joi.object().keys({
-		dataStreamId: Joi.number().required()
-	});
-
-	const args = {
-		dataStreamId: req.params.id
-	};
-
-	const result = Joi.validate(args, schema, {abortEarly: false});
-
-	if (result.error) {
-		return res.status(400).send(responses.invalidArguments(result));
-	}
-
-	twitterService.getTimeline(args.dataStreamId)
-		.then((dataStream) => {
-
-			if (dataStream) {
-				res.status(200).send({dataStream: dataStream.data});
-			} else {
-				res.status(404).send();
-			}
-
-		})
-		.catch((error) => {
-			logger.error(`Error when trying to get the twitter timeline from the dataStreamId ${args.dataStreamId}: ${error}`);
 			next(error);
 		});
 });
@@ -130,6 +103,71 @@ router.route(ROUTES.register).all(registration.middleware).post((req, res, next)
 		.then(() => res.status(200).send())
 		.catch((error) => {
 			logger.error(`Error when requesting a token for client ${args.applicationId}: ${err}`);
+			next(error);
+		});
+});
+
+router.route(ROUTES.search).all(registration.middleware).post((req, res, next) => {
+	const schema = Joi.object().keys({
+		applicationId: Joi.string().guid().required(),
+		keywords: Joi.array().items(
+			Joi.object().keys({
+				keyword: Joi.string().required(),
+				maxId: Joi.number().optional()
+			})).min(1).required()
+	});
+
+	const args = {
+		applicationId: req.body.applicationId,
+		keywords: req.body.keywords
+	};
+
+	const result = Joi.validate(args, schema, {abortEarly: false});
+
+	if (result.error) {
+		return res.status(400).send(responses.invalidArguments(result));
+	}
+
+	twitterService.getApplicationToken(args.applicationId)
+		.then((token) => Promise.all(args.keywords.map((keyword) => twitterService.requestSearch(token, keyword))))
+		.then((results) => {
+			res.status(200).send(results);
+		})
+		.catch((error) => {
+			logger.error(`Error when requesting the search for applicationId ${args.applicationId} from the twitter API: ${error}`);
+			next(error);
+		});
+});
+
+router.route(ROUTES.followers).all(registration.middleware).post((req, res, next) => {
+	const schema = Joi.object().keys({
+		applicationId: Joi.string().guid().required(),
+		accounts: Joi.array().items(
+			Joi.object().keys({
+				screenName: Joi.string().required(),
+				cursor: Joi.number().optional(),
+				count: Joi.number().optional()
+			})).min(1).required()
+	});
+
+	const args = {
+		applicationId: req.body.applicationId,
+		accounts: req.body.accounts
+	};
+
+	const result = Joi.validate(args, schema, {abortEarly: false});
+
+	if (result.error) {
+		return res.status(400).send(responses.invalidArguments(result));
+	}
+
+	twitterService.getApplicationToken(args.applicationId)
+		.then((token) => Promise.all(args.accounts.map((account) => twitterService.requestFollowers(token, account))))
+		.then((results) => {
+			res.status(200).send(results);
+		})
+		.catch((error) => {
+			logger.error(`Error when requesting the search for applicationId ${args.applicationId} from the twitter API: ${error}`);
 			next(error);
 		});
 });

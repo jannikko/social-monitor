@@ -6,7 +6,6 @@ const config = require('config');
 
 const application = require('../models/application');
 const apiCredentials = require('../models/api_credentials');
-const dataStream = require('../models/datastream');
 
 const SOURCE_NAME = config.get('source.twitter.name');
 const API_VERSION = config.get('source.twitter.version');
@@ -16,25 +15,13 @@ const TWITTER_API_URL = config.get('source.twitter.url');
 
 const TIMELINE_URL = TWITTER_API_URL + API_VERSION + TIMELINE_TOPIC_NAME;
 
-function TwitterTimelineError(account, message) {
+function TwitterTimelineError(account, message, status) {
 	this.name = "TwitterTimelineError";
 	this.message = message || `Error when fetching the timeline for a user ${JSON.stringify(account)}`;
+	this.status = 500 || status;
 	this.account = account;
 }
 TwitterTimelineError.prototype = Error.prototype;
-
-/**
- * Extracts the screenName property from a TwitterTimelineError
- * @param {TwitterTimelineError} err
- * @returns {String | null}
- */
-function getAccountFromError(err) {
-	if (err instanceof TwitterTimelineError) {
-		return err.account;
-	} else {
-		return null;
-	}
-}
 
 /**
  * Checks if the response contains a valid access token
@@ -142,19 +129,19 @@ function requestUserTimeline(bearerToken, account) {
 		request({
 			method: 'GET',
 			url: 'https://api.twitter.com/1.1/statuses/user_timeline.json',
-			qs: {'screen_name': account.screenName, 'since_id': account.sinceId},
+			qs: {'screen_name': account.screenName, 'since_id': account.sinceId, 'max_id': account.maxId, 'count': 200},
 			json: true,
 			headers: {
 				'Authorization': 'Bearer ' + bearerToken
 			}
 		}, (err, http, body) => {
 			if (err) {
-				return reject(new TwitterTimelineError(account, err.message));
-			} else if (http.statusCode !== 200) {
-				reject(new TwitterTimelineError(account, `Invalid response code when trying to request the timeline for account: ${JSON.stringify(account)}\n${JSON.stringify(body)}`));
+				return reject(new TwitterTimelineError(account, err.message, 500));
+			}
+			else if (http.statusCode !== 200) {
+				reject(new TwitterTimelineError(account, `Invalid response code when trying to request the timeline for account: ${JSON.stringify(account)}\n${JSON.stringify(body)}`), http.statusCode);
 			} else {
 				resolve({
-					sinceId: account.sinceId,
 					screenName: account.screenName,
 					timeline: body
 				});
@@ -164,58 +151,81 @@ function requestUserTimeline(bearerToken, account) {
 }
 
 /**
- * Store an array of timelines as JSON in the database
- * @param {String} applicationId
- * @param {Array} timelines
+ * Requests the twitterService search endpoint
+ * @param {String} bearerToken
+ * @param {object} keyword
  * @returns {Promise}
  */
-function storeTimelines(applicationId, timelines) {
-	if (!timelines || _.isEmpty(timelines)) {
-		throw new Error(`Empty response from Twitter API for application ${applicationId}`);
-	}
-
-	// Remove errors from timelines
-	const errors = _.remove(timelines, (p) => p.isRejected());
-	const timelinesPayload = timelines.map((tl) => tl.value());
-
-	return dataStream.insert(applicationId, SOURCE_NAME, TOPIC_NAME, TIMELINE_URL, API_VERSION, timelinesPayload)
-		.then((result) => {
-			if (result.rowCount !== 1) {
-				throw new Error(`Error when inserting twitter datastream for ${applicationId}`);
+function requestSearch(bearerToken, keyword) {
+	logger.info(`Requesting Twitter API search for keyword ${JSON.stringify(keyword)} with token ${bearerToken}`);
+	return new Promise((resolve, reject) => {
+		request({
+			method: 'GET',
+			url: 'https://api.twitter.com/1.1/search/tweets.json',
+			qs: {
+				'result_type': 'recent',
+				'q': keyword.keyword + ' -filter:retweets',
+				count: 100,
+				lang: 'en',
+				max_id: keyword.maxId
+			},
+			json: true,
+			headers: {
+				'Authorization': 'Bearer ' + bearerToken
+			}
+		}, (err, http, body) => {
+			if (err) {
+				return reject(err);
+			} else if (http.statusCode !== 200) {
+				reject(new Error(`Invalid response code when trying to search for keyword: ${keyword}\n${JSON.stringify(body)}`));
 			} else {
-				const dataStreamId = _.first(result.rows).id;
-
-				return {
-					dataStream: dataStreamId,
-					errors: errors.map((err) => getAccountFromError(err.reason()))
-				};
+				resolve({
+					keyword: keyword.keyword,
+					result: body
+				});
 			}
 		});
-
+	});
 }
 
 /**
- * Query the timeline for the dataStreamId
- * @param {String} dataStreamId
+ * Requests the twitterService followers endpoint
+ * @param {String} bearerToken
+ * @param {object} account
  * @returns {Promise}
  */
-function getTimeline(dataStreamId) {
-	return dataStream.get(dataStreamId)
-		.then((result) => {
-			if (result.rowCount !== 1) {
-				return null;
+function requestFollowers(bearerToken, account) {
+	logger.info(`Requesting Twitter API followers for account ${JSON.stringify(account)} with token ${bearerToken}`);
+	return new Promise((resolve, reject) => {
+		request({
+			method: 'GET',
+			url: 'https://api.twitter.com/1.1/followers/list.json',
+			qs: {'screen_name': account.screenName, 'cursor': account.cursor, 'count': account.count},
+			json: true,
+			headers: {
+				'Authorization': 'Bearer ' + bearerToken
 			}
-			return _.first(result.rows);
+		}, (err, http, body) => {
+			if (err) {
+				return reject(err);
+			} else if (http.statusCode !== 200) {
+				reject(new Error(`Invalid response code when trying to request followers for account: ${JSON.stringify(account)}\n${JSON.stringify(body)}`));
+			} else {
+				resolve({
+					screenName: account.screenName,
+					result: body
+				});
+			}
 		});
+	});
 }
 
 module.exports = {
 	requestBearerToken,
 	requestUserTimeline,
-	getAccountFromError,
 	registerApplication,
 	getApplicationToken,
 	TwitterTimelineError,
-	storeTimelines,
-	getTimeline
+	requestSearch,
+	requestFollowers
 };

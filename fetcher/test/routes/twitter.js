@@ -1,6 +1,7 @@
 const sinon = require('sinon');
 const assert = require('chai').assert;
 const _ = require('lodash');
+const Promise = require('bluebird');
 
 const server = require('../helpers/server');
 const validation = require('../../enums/validation');
@@ -180,39 +181,42 @@ describe('/twitter', function () {
 				before(() => {
 					sinon.stub(twitter, 'requestUserTimeline').resolves(goodMockResponse);
 					sinon.stub(twitter, 'getApplicationToken').resolves(testToken);
-					sinon.stub(twitter, 'storeTimelines').resolves(goodMockResponse);
 				});
 
 				after(() => {
 					twitter.requestUserTimeline.restore();
 					twitter.getApplicationToken.restore();
-					twitter.storeTimelines.restore();
 				});
 
 				it('should respond with OK when registration is successful', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(201, done)
+						.expect(200, done)
 				});
 			});
 
 			describe('with some bad screenNames', () => {
+
+				const response = goodRequest.accounts.map((acc) => {
+					return {screenName: acc.screenName, body: {}}
+				});
+
 				before(() => {
-					sinon.stub(twitter, 'requestUserTimeline').resolves();
+					const stub = sinon.stub(twitter, 'requestUserTimeline');
+					stub.onCall(0).resolves(response[0]);
+					stub.onCall(1).resolves(response[1]);
 					sinon.stub(twitter, 'getApplicationToken').resolves(testToken);
-					sinon.stub(twitter, 'storeTimelines').resolves(someBadMockResponse);
 				});
 
 				after(() => {
 					twitter.requestUserTimeline.restore();
 					twitter.getApplicationToken.restore();
-					twitter.storeTimelines.restore();
 				});
 
-				it('should respond with 207 Multi-Status', (done) => {
+				it('should respond with 200 OK', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(207, {errors: [{screenName: 'outlandish'}]})
+						.expect(200, {success: response, errors: []})
 						.end((err, res) => {
 							if (err) throw err;
 							done();
@@ -245,60 +249,18 @@ describe('/twitter', function () {
 				before(() => {
 					sinon.stub(twitter, 'requestUserTimeline').resolves();
 					sinon.stub(twitter, 'getApplicationToken').resolves(testToken);
-					sinon.stub(twitter, 'storeTimelines').resolves(goodMockResponse);
 				});
 
 				after(() => {
 					twitter.requestUserTimeline.restore();
 					twitter.getApplicationToken.restore();
-					twitter.storeTimelines.restore();
 				});
 
-				it('should respond with 201 Created', (done) => {
+				it('should respond with 200 Created', (done) => {
 					server.post(ENDPOINT)
 						.send(goodRequest)
-						.expect(201, done)
+						.expect(200, done)
 				});
-
-				it('should call storeTimelines for each good screenName', (done) => {
-					assert.ok(twitter.storeTimelines.calledOnce);
-					done();
-				});
-			});
-		});
-	});
-
-	describe('GET /timeline', function () {
-
-		const ENDPOINT = '/twitter/timeline/1';
-
-		describe('good request', () => {
-
-			before(() => {
-				sinon.stub(twitter, 'getTimeline').resolves({"data": []});
-			});
-
-			after(() => {
-				twitter.getTimeline.restore();
-			});
-
-			it('should respond with 200 OK', (done) => {
-				server.get(ENDPOINT).expect(200, done);
-			});
-		});
-
-		describe('good request with id not in db', () => {
-
-			before(() => {
-				sinon.stub(twitter, 'getTimeline').resolves(null);
-			});
-
-			after(() => {
-				twitter.getTimeline.restore();
-			});
-
-			it('should respond with 404', (done) => {
-				server.get(ENDPOINT).expect(404, done);
 			});
 		});
 	});

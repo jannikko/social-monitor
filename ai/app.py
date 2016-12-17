@@ -1,35 +1,33 @@
 from flask import Flask, request, abort
-from tasks import timeline
-from models import application, engine, topic_group, account
+from models import application, engine, account
 from sqlalchemy.sql.expression import insert, select
 from enums import SOURCES
+import json
+import models.topic
+import models.topic_model
 
 app = Flask(__name__)
 
 
-def restart_task():
-    pass
+def create_timeline_response(topic_model, account_topics):
+    return {'topicModel': {'topics': topic_model['topics'], 'date': str(topic_model['date'])},
+            'topic': [{'account': {'name': account_topic['name'],
+                                   'source': account_topic['source']},
+                       'cluster': account_topic['cluster'],
+                       'x': account_topic['x'],
+                       'y': account_topic['y'],
+                       'date': str(account_topic['date'])} for account_topic in account_topics]}
 
 
-@app.route('/timeline/start', methods=['POST'])
-def start():
-    req = request.get_json()
-    application_id = req['applicationId']
-    # Needs real validation
-    if not application_id:
-        abort(400)
-
-    # Move this to controller
-    with engine.begin() as conn:
-        select_stmt = select([application]).where(application.c.id == application_id)
-        result = conn.execute(select_stmt).fetchall()
-        if result:
-            # Redirect to register
-            timeline.delay(application_id)
-        else:
+@app.route('/timeline/<application_id>', methods=['GET'])
+def timeline(application_id):
+    with engine.begin() as connection:
+        topic_model = models.topic_model.select_latest(application_id, SOURCES['TWITTER'], connection)
+        if not topic_model:
             abort(404)
-
-    return str()
+        account_topics = models.topic.select_multiple_join_accounts(topic_model['id'], connection)
+        view_representation = create_timeline_response(topic_model, account_topics)
+        return json.dumps(view_representation)
 
 
 @app.route('/timeline/register', methods=['POST'])
@@ -56,10 +54,9 @@ def register():
             for twitter_account in twitter_accounts:
                 insert_account = insert(account, values={'name': twitter_account,
                                                          'source': SOURCES['TWITTER'],
-                                                         'application': application_id})
+                                                         'application': application_id,
+                                                         'isMain': True})
                 conn.execute(insert_account)
-
-            timeline.delay(application_id)
 
     return str()
 

@@ -9,7 +9,9 @@ if 'APP_ENV' in os.environ and os.environ['APP_ENV'] == 'development':
 
 DEFAULTS = {
     'REDIS_URI': 'redis://localhost:6379',
-    'TWITTER_TIMELINE': 'http://localhost:8081/twitter/timeline'
+    'TWITTER_TIMELINE': 'http://localhost:8081/twitter/timeline',
+    'TWITTER_SEARCH': 'http://localhost:8081/twitter/search',
+    'TWITTER_FOLLOWERS': 'http://localhost:8081/twitter/followers'
 }
 
 

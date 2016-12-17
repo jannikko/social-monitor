@@ -1,19 +1,13 @@
-from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, ForeignKey, TypeDecorator, CHAR, ARRAY, \
-    insert, select, UniqueConstraint, DateTime, Float
+from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, ForeignKey, TypeDecorator, CHAR, \
+    insert, select, UniqueConstraint, Boolean, BIGINT, CheckConstraint, DateTime, ARRAY, Float
+from sqlalchemy.sql.expression import func, text
 from sqlalchemy.dialects.postgresql import UUID
 from enums import SOURCES
-import datetime
 import config
 import uuid
 
 
 class GUID(TypeDecorator):
-    """Platform-independent GUID type.
-
-    Uses Postgresql's UUID type, otherwise uses
-    CHAR(32), storing as stringified hex values.
-
-    """
     impl = CHAR
 
     def load_dialect_impl(self, dialect):
@@ -31,7 +25,6 @@ class GUID(TypeDecorator):
             if not isinstance(value, uuid.UUID):
                 return "%.32x" % uuid.UUID(value).int
             else:
-                # hexstring
                 return "%.32x" % value.int
 
     def process_result_value(self, value, dialect):
@@ -53,6 +46,8 @@ print("Connecting to database with the following credentials:", db_config)
 
 engine = create_engine('postgres://{username}:{password}@{host}:{port}/{database}'.format(**db_config), echo=True)
 
+engine.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+
 metadata = MetaData()
 
 application = Table('application', metadata,
@@ -66,22 +61,39 @@ account = Table('account', metadata,
                 Column('name', String, nullable=False),
                 Column('source', String, ForeignKey('source.id'), nullable=False),
                 Column('application', GUID, ForeignKey('application.id'), nullable=False),
-                Column('since_id', String, nullable=True),
-                Column('timeline', ARRAY(String), nullable=True),
-                UniqueConstraint('name', 'source', 'application', name='uix_1'))
+                Column('isMain', Boolean, nullable=False),
+                Column('isComplete', Boolean, default=False, nullable=False),
+                Column('next_cursor', BIGINT, default=-1, nullable=False),
+                UniqueConstraint('name', 'source', 'application'))
 
-topic_group = Table('topic_group', metadata,
+timeline = Table('timeline', metadata,
+                 Column('id', BIGINT),
+                 Column('account', Integer, ForeignKey('account.id'), nullable=False),
+                 Column('text', String, nullable=False),
+                 Column('date', DateTime, nullable=False),
+                 Column('processed', Boolean, nullable=False, default=False),
+                 UniqueConstraint('account', 'id'))
+
+account_relationship = Table('account_relationship', metadata,
+                             Column('account', Integer, ForeignKey('account.id'), nullable=False),
+                             Column('follower', Integer, ForeignKey('account.id'), nullable=False),
+                             CheckConstraint('account != follower', name='checkRelationship'))
+
+topic_model = Table('topic_model', metadata,
                     Column('id', Integer, primary_key=True),
-                    Column('date', DateTime, nullable=False, default=datetime.datetime.now()),
+                    Column('date', DateTime(timezone=True), server_default=func.now(), nullable=False),
                     Column('application', GUID, ForeignKey('application.id'), nullable=False),
-                    Column('features', ARRAY(Float), nullable=False),
-                    Column('wordvec', ARRAY(String), nullable=False))
+                    Column('topics', ARRAY(String), nullable=False),
+                    Column('source', String, ForeignKey('source.id'), nullable=False))
 
 topic = Table('topic', metadata,
-              Column('id', Integer, primary_key=True),
+              Column('account', Integer, ForeignKey('account.id'), nullable=False),
+              Column('topic_model', Integer, ForeignKey('topic_model.id'), nullable=False),
               Column('weights', ARRAY(Float), nullable=False),
-              Column('topic_group', Integer, ForeignKey('topic_group.id'), nullable=False),
-              Column('account', Integer, ForeignKey('account.id'), nullable=False))
+              Column('cluster', Integer, nullable=True),
+              Column('x', Float, nullable=True),
+              Column('y', Float, nullable=True),
+              Column('date', DateTime(timezone=True), server_default=func.now(), nullable=False))
 
 metadata.create_all(engine)
 
