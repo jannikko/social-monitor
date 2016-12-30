@@ -1,6 +1,6 @@
 from sqlalchemy import select, update, and_, not_, delete, insert
 from sqlalchemy.sql.expression import func
-from models import account, timeline
+from models.schema import account, timeline
 from util import itermap_to_dict
 
 
@@ -78,7 +78,7 @@ def select_multiple_by_id(account_ids, conn):
 def select_one_by_id(account_id, conn):
     stmt = select([account]).where(account.c.id == account_id)
     result = conn.execute(stmt).first()
-    return dict(result)
+    return dict(result) if result else None
 
 
 def update_one_iscomplete(account_id, conn):

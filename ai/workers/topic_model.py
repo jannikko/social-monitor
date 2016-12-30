@@ -3,11 +3,12 @@ from gensim.models.ldamodel import LdaModel
 from preprocess import getwords
 from pyLDAvis import gensim
 from enums import SOURCES
-from itertools import chain
 from sklearn.cluster import DBSCAN
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
 from models import engine
+import timeit
+import multiprocessing
 import models.account
 import models.topic
 import models.topic_model
@@ -25,15 +26,20 @@ NUM_TOPIC_WORDS = 10
 
 def calculate_topics(application_id):
     with engine.begin() as connection:
-        accounts = models.account.select_multiple_complete(application_id, SOURCES['TWITTER'], connection)
         topic_model = models.topic_model.select_latest(application_id, SOURCES['TWITTER'], connection)
+
+        if not topic_model:
+            return
+
+        accounts = list(models.account.select_multiple_complete(application_id, SOURCES['TWITTER'], connection))
         lda_model = LdaModel.load('lda_model/ldamodel')
         dictionary = Dictionary.load('lda_model/dictionary')
-        for account in accounts:
-            timeline = (getwords(status['text']) for status in models.timeline.select_one(account['id'], connection))
-            bow = dictionary.doc2bow(chain.from_iterable(timeline))
-            weights = getDocumentTopicWeights(lda_model, bow)
+        documents = load_documents(accounts, connection)
+        for account, document in zip(accounts, documents):
+            bow = dictionary.doc2bow(document)
+            weights = get_document_topic_weights(lda_model, bow)
             models.topic.insert_one(account['id'], weights, topic_model['id'], connection)
+    cluster_accounts(application_id)
 
 
 def get_top_cluster_topics(weights_matrix, limit=3):
@@ -92,7 +98,7 @@ def plot_accounts(cluster_labels, coordinate_matrix, weights_matrix, topic_words
     plt.show()
 
 
-def cluster_accounts(application_id, topic_model=None):
+def cluster_accounts(application_id):
     with engine.begin() as connection:
         topic_model = models.topic_model.select_latest(application_id, SOURCES['TWITTER'], connection)
 
@@ -113,58 +119,60 @@ def cluster_accounts(application_id, topic_model=None):
         weights_matrix = np.array(weights).astype(float)
 
         tsne = TSNE(n_components=2).fit_transform(weights_matrix)
-        db = DBSCAN(eps=1.8, min_samples=5).fit(tsne)
+        db = DBSCAN(eps=1.75, min_samples=5).fit(tsne)
 
         cluster_labels = db.labels_
         for label, account_id, coords in zip(cluster_labels, account_ids, tsne):
             models.topic.update_cluster(account_id, topic_model['id'], int(label), coords[0], coords[1], connection)
 
-        # plot_accounts(cluster_labels, tsne, weights_matrix, topic_model['topics'])
 
-
-def createDictionary(application_id):
-    dictionary = Dictionary()
-    with engine.connect() as connection:
-        accounts = models.account.select_multiple_complete(application_id, SOURCES['TWITTER'], connection)
-        for account in accounts:
-            dictionary.add_documents(
-                getwords(status['text']) for status in models.timeline.select_one(account['id'], connection))
+def create_dictionary(documents):
+    dictionary = Dictionary(documents)
     dictionary.filter_extremes(no_below=3, no_above=0.5)
     return dictionary
 
 
+def document_to_tokens(timeline):
+    document = " ".join(status['text'] for status in timeline)
+    return getwords(document)
+
+
+def load_documents(accounts, connection):
+    documents = []
+    for account in accounts:
+        documents.append(list(models.timeline.select_one(account['id'], connection)))
+    start_time = timeit.default_timer()
+    logging.debug('Preprocessing documents')
+    pool = multiprocessing.Pool(4)
+    documents = pool.imap_unordered(document_to_tokens, documents)
+    logging.debug('Preprocessing finished. Execution time: %s' % (timeit.default_timer() - start_time))
+    return list(documents)
+
+
 class MyCorpus(object):
-    def __init__(self, dictionary, application_id):
+    def __init__(self, dictionary, documents):
         self.dictionary = dictionary
-        self.application_id = application_id
+        self.documents = documents
 
     def __iter__(self):
-        with engine.connect() as connection:
-            accounts = models.account.select_multiple_complete(self.application_id, SOURCES['TWITTER'], connection)
-            for account in accounts:
-                timeline = (getwords(status['text']) for status in
-                            models.timeline.select_one(account['id'], connection))
-                yield self.dictionary.doc2bow(chain.from_iterable(timeline))
+        for document in self.documents:
+            yield self.dictionary.doc2bow(document)
 
 
-def createCorpus(dictionary, application_id):
-    return MyCorpus(dictionary, application_id)
+def create_lda_model(corpus, dictionary):
+    return LdaModel(corpus=corpus, id2word=dictionary, num_topics=NUM_TOPICS, alpha=0.001, passes=20)
 
 
-def createLdaModel(corpus, dictionary):
-    return LdaModel(corpus=corpus, id2word=dictionary, num_topics=NUM_TOPICS, alpha=0.001)
-
-
-def getTopicWords(lda_model, num_words=10):
+def get_topic_words(lda_model, num_words=10):
     return [[word for word, weight in topic] for _, topic in
             lda_model.show_topics(num_topics=NUM_TOPICS, num_words=num_words, formatted=False)]
 
 
-def getDocumentTopicWeights(lda_model, bow):
+def get_document_topic_weights(lda_model, bow):
     return [weight for topic, weight in lda_model.get_document_topics(bow, minimum_probability=0)]
 
 
-def plotLda():
+def plot_lda():
     lda_model = LdaModel.load('lda_model/ldamodel')
     SerializedCorpus = MmCorpus('lda_model/corpus.mm')
     dictionary = Dictionary.load('lda_model/dictionary')
@@ -172,15 +180,25 @@ def plotLda():
     pyLDAvis.save_html(vis_data, 'lda_model/lda_visualization.html')
 
 
-def createTopicModel(application_id):
+def create_topic_model(application_id):
+    logging.info('Starting to create topic model for application id: %s' % application_id)
     with engine.begin() as connection:
-        dictionary = createDictionary(application_id)
-        corpus = createCorpus(dictionary, application_id)
+        logging.info('Requesting complete accounts')
+        accounts = list(models.account.select_multiple_complete(application_id, SOURCES['TWITTER'], connection))
+
+        logging.info('Loading documents')
+        documents = load_documents(accounts, connection)
+
+        logging.info('Creating dictionary')
+        dictionary = create_dictionary(documents)
+
         dictionary.save('lda_model/dictionary')
-        MmCorpus.serialize('lda_model/corpus.mm', corpus)
+        logging.info('Creating corpus')
+        MmCorpus.serialize('lda_model/corpus.mm', MyCorpus(dictionary, documents))
         corpus = MmCorpus('lda_model/corpus.mm')
-        lda_model = createLdaModel(corpus, dictionary)
+
+        logging.info('Creating LDA Model')
+        lda_model = create_lda_model(corpus, dictionary)
         lda_model.save('lda_model/ldamodel')
-        lda_model = LdaModel.load('lda_model/ldamodel')
-        topics_words = getTopicWords(lda_model, NUM_TOPIC_WORDS)
+        topics_words = get_topic_words(lda_model, NUM_TOPIC_WORDS)
         models.topic_model.insert_one(application_id, SOURCES['TWITTER'], topics_words, connection)

@@ -39,7 +39,7 @@ def calculate_max_iterations(limit, chunksize):
     return max_requests
 
 
-def request_user_timelines(application_id, is_main=True, requests_left=1500, request_chunks=30):
+def request_user_timelines(application_id, is_main=True, requests_left=1500, request_chunks=5):
     with engine.connect() as connection:
         # Select accounts that have not been completely fetched
         accounts = account_model.select_multiple_incomplete(application_id, SOURCES['TWITTER'], connection,
@@ -68,7 +68,8 @@ def request_user_timelines(application_id, is_main=True, requests_left=1500, req
 
             accounts_timeline = account_model.select_oldest_timelines(account_ids, connection)
             timeline_payload = create_timeline_payload(accounts_timeline)
-            request = create_post_request(TWITTER_TIMELINE, {'applicationId': application_id, 'accounts': timeline_payload})
+            request = create_post_request(TWITTER_TIMELINE,
+                                          {'applicationId': application_id, 'accounts': timeline_payload})
 
             try:
                 timeline_response = urlopen(request)
@@ -84,19 +85,23 @@ def request_user_timelines(application_id, is_main=True, requests_left=1500, req
                     for account in response['success']:
                         name = account['screenName']
                         timeline = account['timeline']
-                        statuses = [{'text': status['text'], 'id': status['id'], 'date': convert_twitter_date(status['created_at'])} for status in timeline]
+                        statuses = [{'text': status['text'], 'id': status['id'],
+                                     'date': convert_twitter_date(status['created_at'])} for status in timeline]
 
                         if len(statuses) > 1:
-                            account_timeline.insert_multiple(application_id, name, SOURCES['TWITTER'], statuses[1:], connection)
+                            account_timeline.insert_multiple(application_id, name, SOURCES['TWITTER'], statuses[1:],
+                                                             connection)
                         else:
-                            account_id = account_model.select_one_id(application_id, name, SOURCES['TWITTER'], connection)
+                            account_id = account_model.select_one_id(application_id, name, SOURCES['TWITTER'],
+                                                                     connection)
                             account_model.update_one_iscomplete(account_id, connection)
                             account_ids.remove(account_id)
                     for res in response['errors']:
                         name = res['screenName']
                         status = res['status']
                         if status == 404:
-                            account_id = account_model.select_one_id(application_id, name, SOURCES['TWITTER'], connection)
+                            account_id = account_model.select_one_id(application_id, name, SOURCES['TWITTER'],
+                                                                     connection)
                             if not account_id:
                                 continue
                             account = account_model.select_one_by_id(account_id, connection)

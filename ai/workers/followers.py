@@ -11,7 +11,7 @@ import config
 TWITTER_FOLLOWERS = config.get('TWITTER_FOLLOWERS')
 
 
-def create_timeline_payload(application_id, count, users):
+def create_timeline_payload(application_id: str, count: int, users: object) -> object:
     return create_post_request(TWITTER_FOLLOWERS, {'applicationId': application_id,
                                                    'accounts': [{'screenName': user['name'],
                                                                  'count': count,
@@ -19,9 +19,9 @@ def create_timeline_payload(application_id, count, users):
                                                                 in users]})
 
 
-def requestFollowers(application_id, count=200, requests_left=15):
+def request_followers(application_id, count=200, requests_left=15):
     with engine.connect() as connection:
-        main_users = models.account.select_main_with_followers(application_id, SOURCES['TWITTER'], connection)
+        main_users = list(models.account.select_main_with_followers(application_id, SOURCES['TWITTER'], connection))
         if not main_users:
             return requests_left
 
@@ -50,7 +50,6 @@ def requestFollowers(application_id, count=200, requests_left=15):
                         users = result['users']
                         cursor = result['next_cursor']
                         user_followers = [user['screen_name'] for user in users if not user['protected']]
-
                         models.account_relationship.insert_multiple(application_id, name, user_followers,
                                                                     SOURCES['TWITTER'], cursor, connection)
                 else:

@@ -1,6 +1,6 @@
 from sqlalchemy import insert, select, and_
 from sqlalchemy.sql.expression import func
-from models import timeline
+from models.schema import timeline
 from models.account import select_one_id
 from util import itermap_to_dict
 
@@ -35,4 +35,10 @@ def insert_multiple(application_id, account_name, source, statuses, conn):
 @itermap_to_dict
 def select_one(account_id, conn):
     stmt = select([timeline]).where(timeline.c.account == account_id)
+    return conn.execute(stmt)
+
+
+@itermap_to_dict
+def select_multiple(account_ids, conn):
+    stmt = select([timeline], timeline.c.account.in_(account_ids))
     return conn.execute(stmt)

@@ -1,6 +1,6 @@
 from sqlalchemy import insert, delete
 from models.account import select_one_id, insert_one, update_one_cursor
-from models import account_relationship
+from models.schema import account_relationship
 
 
 def delete_follower_account_rel(account_id, conn):

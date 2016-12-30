@@ -22,7 +22,6 @@ def getwords(text):
     wnl = WordNetLemmatizer()
     tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
     stop = set(stopwords.words('english')) | custom_stopwords
-
     tokens = [wnl.lemmatize(re.sub(r'\W+', '', i.lower())) for i in tokenizer.tokenize(text)]
     filtered_tokens = [token for token in tokens if token
                        and not re.match('^-?[0-9]+$', token)

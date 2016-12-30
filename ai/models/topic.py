@@ -1,6 +1,5 @@
 from sqlalchemy import insert, select, update, and_
-from models import topic
-from models import account
+from models.schema import topic, account
 from util import itermap_to_dict
 
 

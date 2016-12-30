@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from models import application
+from models.schema import application
 
 
 def select_multiple(conn):
