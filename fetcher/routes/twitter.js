@@ -12,7 +12,6 @@ const util = require('../services/util');
 const router = express.Router({mergeParams: true});
 
 const ROUTES = {
-	'timeline': '/twitter/timeline/:id',
 	'timelines': '/twitter/timeline',
 	'register': '/twitter/register',
 	'search': '/twitter/search',
@@ -25,7 +24,6 @@ const ROUTES = {
  * @param {array} accounts - An array of the Twitter screenNames that should be fetched
  */
 router.route(ROUTES.timelines).all(registration.middleware).post((req, res, next) => {
-
 	const schema = Joi.object().keys({
 		applicationId: Joi.string().guid().required(),
 		accounts: Joi.array().items(

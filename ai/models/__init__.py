@@ -3,9 +3,6 @@ from enums import SOURCES
 from models.schema import metadata, source
 import config
 
-
-
-
 db_config = {
     'username': config.get('DB_USER'),
     'password': config.get('DB_PASSWORD'),

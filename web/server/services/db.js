@@ -36,10 +36,10 @@ function query(sql, args){
 	return new Promise((resolve, reject) => {
 		get().connect((err, client, done) => {
 			if (err) {
-				logger.error('Error connection to the database: ' + err);
+				logger.error('Error connecting to the database: ' + err);
 				return reject(err);
 			}
-			
+
 			client.query(sql, args, (err, result) => {
 				// Release the connection to the connection pool
 				done();

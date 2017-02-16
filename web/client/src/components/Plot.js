@@ -2,47 +2,13 @@ import React from "react";
 import Plotly from "plotly.js";
 import _ from "lodash";
 import {connect} from "react-redux";
+import AccountLabel from "./AccountLabel";
 
 
 function unpack(rows, key) {
   return rows.map(function (row) {
     return row[key];
   });
-}
-
-function calculateMeanWeights(weights) {
-  if (weights && weights.length) {
-    const meanInit = weights[0];
-
-    if (weights.length == 1) {
-      return meanInit;
-    }
-
-    const sums = weights.slice(1, weights.length).reduce((a, b) => {
-      return a.map((x, i) => x + b[i]);
-    }, meanInit);
-
-    return sums.map((x) => x / weights.length)
-  }
-}
-
-function calculateMeanTopics(weights, threshold = 0.3) {
-  let indexedWeights = _.zip(weights, _.range(weights.length));
-  indexedWeights.sort((x, y) => y[0] - x[0]);
-  let topics = [];
-  for (let weightSum = 0, i = 0; i < indexedWeights.length && weightSum < threshold; i++) {
-    const [weight, index] = indexedWeights[i];
-    weightSum += weight;
-    topics.push(index);
-  }
-
-  return topics;
-}
-
-function createTopicLabels(weightIndices, topicVec, wordsPerTopic = 5) {
-  return weightIndices
-    .map((i) => `Topic ${i}: ${topicVec[i].slice(0, wordsPerTopic).join(', ')}`)
-    .join(', ');
 }
 
 function assignTopicsToClusters(topics) {
@@ -73,26 +39,23 @@ class Plot extends React.Component {
       topics: props.topics,
       clusters: null,
       clusterIds: null,
-      clusterLabels: null
+      clusterLabels: null,
+      selection: {},
+      rendered: false
     };
   }
 
   componentWillReceiveProps(nextProps) {
-      this.state.loading = nextProps.loading;
-      this.state.topics = nextProps.topics;
+    this.state.loading = nextProps.loading;
+    this.state.topics = nextProps.topics;
   }
 
   componentDidUpdate() {
-    if (!this.state.loading) {
-      const clusters = assignTopicsToClusters(this.state.topics.topic);
+    if (!this.state.loading && !this.state.rendered) {
+      const clusters = assignTopicsToClusters(this.state.topics.accounts);
 
-      const clusterIds = Object.keys(clusters);
+      let clusterIds = Object.keys(clusters).filter(id => id != -1);
       clusterIds.sort((a, b) => a - b);
-
-      const weights = clusterIds.map((id) => clusters[id].map(topic => topic.weights));
-      const meanClusterWeights = weights.map(calculateMeanWeights);
-      const meanTopics = meanClusterWeights.map((meanWeights) => calculateMeanTopics(meanWeights));
-      const clusterLabels = meanTopics.map((weightIndices) => createTopicLabels(weightIndices, this.state.topics.topicModel.topics));
 
       const data = clusterIds.map((clusterId) => {
         const specificCluster = clusters[clusterId];
@@ -101,7 +64,7 @@ class Plot extends React.Component {
           name: `Cluster ${clusterId}`,
           x: unpack(specificCluster, 'x'),
           y: unpack(specificCluster, 'y'),
-          text: specificCluster.map(val => val.account.name),
+          text: specificCluster.map(account => account.name),
           marker: {
             sizemode: 'area',
             size: specificCluster.map(x => 100),
@@ -111,23 +74,52 @@ class Plot extends React.Component {
       });
       const layout = {
         width: 1200,
-        height: 1000,
+        height: 720,
         margin: {t: 20},
         hovermode: 'closest',
         showlegend: true,
         legend: {x: 100, y: 1}
       };
       Plotly.plot('plot', data, layout, {showLink: false});
-      document.getElementById('legend').innerHTML = _.zip(clusterIds, clusterLabels)
-        .map(([id, label]) => `<p>Cluster ${id}: ${label}</p>`).join('');
+      this.state.rendered = true;
+
+      document.getElementById('plot').on('plotly_click', function (data) {
+        for (var i = 0; i < data.points.length; i++) {
+          const point = data.points[i];
+          const pointNumber = point.pointNumber;
+          const clusterId = point.curveNumber;
+          const account = clusters[clusterId][pointNumber];
+
+          window.location = `https://www.twitter.com/${account.name}`;
+        }
+      });
+      document.getElementById('plot').on('plotly_hover', function (data) {
+        for (var i = 0; i < data.points.length; i++) {
+          const point = data.points[i];
+          const pointNumber = point.pointNumber;
+          const clusterId = point.curveNumber;
+          const account = clusters[clusterId][pointNumber];
+          this.setState({selection: {name: account.name, weights: account.weights}})
+        }
+      }.bind(this));
     }
   }
 
 // render
   render() {
+    const label = this.state.loading ? <div></div> :
+      <AccountLabel name={this.state.selection.name} weights={this.state.selection.weights}
+                    wordVec={this.state.topics.topicModel.wordVectors}/>;
+
     return (
       <div>
+        <div className="page-header">
+          <h1>Social Monitor <br/>
+            <small>Topic Extraction von Twitter-Accounts</small>
+          </h1>
+        </div>
         <div id="plot"></div>
+        {label}
         <div id="legend"></div>
       </div>
     );

@@ -1,12 +1,12 @@
 import re
-from nltk.corpus import stopwords, wordnet
+from nltk.corpus import stopwords
 from nltk.tokenize import TweetTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.tag import pos_tag
 
 custom_stopwords = {'dont', 'great', 'this', 'like', 'it', 'next', 'ive', 'http', 'thanks', 'much', 'what', 'with',
                     'were', 'need', 'more', 'word', 'say', 'here', 'very', 'these', 'take', 'stuff', 'youre', 'every',
-                    'isnt', 'come', 'week', 'thanks', 'with', 'week', 'year', 'day', 'great', 'thats', 'today',
+                    'isnt', 'come', 'thanks', 'with', 'week', 'year', 'day', 'great', 'thats', 'today',
                     'tomorrow', 'could', 'please', 'really', 'tonight', 'first', 'coming', 'though', 'although',
                     'amazing', 'awesome', 'might', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
                     'sunday', 'weekend', 'month', 'using', 'night', 'going', 'people', 'thing', 'still', "think",
@@ -14,11 +14,11 @@ custom_stopwords = {'dont', 'great', 'this', 'like', 'it', 'next', 'ive', 'http'
                     "thank", "morning", "happy", "maybe", "pretty", "someone", "actually", "interesting", "little",
                     "sorry", "quite", "point", "working", "start", "email", "tryin", 'medium', 'another'}
 
-irrelevant_word_types = ['ADP', 'ADV', 'CONJ', 'DET', 'NUM', 'PRT', 'PRON']
+irrelevant_word_categories = ['ADP', 'ADV', 'CONJ', 'DET', 'NUM', 'PRT', 'PRON']
 
 
-# Remove stopwords and transform to lowercase
-def getwords(text):
+def getwords(text: str) -> list:
+    """Tokenizes the text and filters out stopwords and certain word categories."""
     wnl = WordNetLemmatizer()
     tokenizer = TweetTokenizer(strip_handles=True, reduce_len=True)
     stop = set(stopwords.words('english')) | custom_stopwords
@@ -27,7 +27,6 @@ def getwords(text):
                        and not re.match('^-?[0-9]+$', token)
                        and not re.match('^http.*', token)
                        and token not in stop
-                       and wordnet.synsets(token)
                        and len(token) > 4 and len(token) < 15]
     tagged_tokens = pos_tag(filtered_tokens)
-    return [token for token, pos in tagged_tokens if pos not in irrelevant_word_types]
+    return [token for token, pos in tagged_tokens if pos not in irrelevant_word_categories]

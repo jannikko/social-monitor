@@ -1,5 +1,6 @@
 import React from "react";
 import "../stylesheets/main.scss";
+import {Link} from 'react-router';
 
 // app component
 export default class App extends React.Component {
@@ -9,6 +10,6 @@ export default class App extends React.Component {
       <div className="container">
         {this.props.children}
       </div>
-    );
+    )
   }
 }

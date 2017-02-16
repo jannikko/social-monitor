@@ -12,6 +12,18 @@ services:
       - db
     ports:
       - "8081:8081"
+  web:
+    build: ./web
+    environment:
+      DB_USER: ${WEB_DB_NAME}
+      DB_NAME: ${WEB_DB_USER}
+      DB_PASSWORD: ${WEB_DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+    links:
+      - db
+    ports:
+      - "8082:8082"
   ai:
     restart: always
     build: ./ai
@@ -44,6 +56,9 @@ services:
         AI_DB_NAME: ${AI_DB_NAME}
         AI_DB_USER: ${AI_DB_USER}
         AI_DB_PASSWORD: ${AI_DB_PASSWORD}
+        WEB_DB_USER: ${WEB_DB_NAME}
+        WEB_DB_NAME: ${WEB_DB_USER}
+        WEB_DB_PASSWORD: ${WEB_DB_PASSWORD}
         FETCHER_DB_NAME: ${FETCHER_DB_NAME}
         FETCHER_DB_USER: ${FETCHER_DB_USER}
         FETCHER_DB_PASSWORD: ${FETCHER_DB_PASSWORD}

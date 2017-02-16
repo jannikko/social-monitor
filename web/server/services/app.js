@@ -20,12 +20,12 @@ Promise.config({
 
 global.Promise = Promise;
 
-/**
- * Event listener for HTTP server "listening" event.
- */
 const app = express();
 
 app.use(express.static(path.join(__dirname, '../../public')));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({extended: false}));
+app.use(cookieParser());
 
 if (app.get('env') === 'development') {
 
@@ -55,7 +55,6 @@ if (app.get('env') === 'development') {
 
 app.use('/', routes);
 
-
 // customise the log format
 const components = [
   chalk.gray("{{req.method}}"),
@@ -71,23 +70,20 @@ app.use(expressWinston.logger({
   msg: components.join(' ')
 }));
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: false}));
-app.use(cookieParser());
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
-	var err = new Error('Not Found');
-	err.status = 404;
-	next(err);
+  var err = new Error('Not Found');
+  err.status = 404;
+  next(err);
 });
 
 
 app.use((err, req, res) => {
-	logger.error(err);
-	if (!res.headersSent) {
-		res.status(err.status || 500).send('Internal server error');
-	}
+  logger.error(err);
+  if (!res.headersSent) {
+    res.status(err.status || 500).send('Internal server error');
+  }
 });
 
 

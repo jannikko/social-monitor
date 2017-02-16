@@ -70,12 +70,17 @@ topic_model = Table('topic_model', metadata,
                     Column('topics', ARRAY(String), nullable=False),
                     Column('source', String, ForeignKey('source.id'), nullable=False))
 
+topic_iteration = Table('topic_iteration', metadata,
+                        Column('id', Integer, primary_key=True),
+                        Column('topic_model', Integer, ForeignKey('topic_model.id'), nullable=False),
+                        Column('date', DateTime(timezone=True), server_default=func.now(), nullable=False))
+
+
 topic = Table('topic', metadata,
+              Column('id', Integer, primary_key=True),
               Column('account', Integer, ForeignKey('account.id'), nullable=False),
-              Column('topic_model', Integer, ForeignKey('topic_model.id'), nullable=False),
+              Column('topic_iteration', Integer, ForeignKey('topic_iteration.id'), nullable=False),
               Column('weights', ARRAY(Float), nullable=False),
               Column('cluster', Integer, nullable=True),
               Column('x', Float, nullable=True),
-              Column('y', Float, nullable=True),
-              Column('date', DateTime(timezone=True), server_default=func.now(), nullable=False))
-
+              Column('y', Float, nullable=True))
